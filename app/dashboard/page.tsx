@@ -81,6 +81,26 @@ export default function DashboardPage() {
       title="Dashboard"
       description="Your learning command center — ingest content, learn, and track progress."
     >
+      {resources.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/40 to-indigo-950/40 p-6 backdrop-blur-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+        >
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-indigo-200">Welcome to AetherLearn!</h2>
+            <p className="text-sm text-indigo-200/80">
+              Start by adding some content — paste a URL, upload a file, or type your notes.
+            </p>
+          </div>
+          <Link href="/ingestion">
+            <Button className="min-h-[44px] bg-gradient-to-r from-indigo-600 to-purple-600 text-white shrink-0">
+              Get Started
+            </Button>
+          </Link>
+        </motion.div>
+      )}
+
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((card, i) => (
           <motion.div

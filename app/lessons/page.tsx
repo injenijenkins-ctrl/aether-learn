@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Book } from 'lucide-react';
 import { useLearn, type Lesson, type LessonDepth } from '@/hooks/use-lumina';
 import { logActivity } from '@/lib/activity-store';
 
@@ -155,6 +155,19 @@ export default function LessonsPage() {
             </Button>
           </div>
         </motion.article>
+      )}
+
+      {!lesson && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.15] bg-white/[0.08] p-8 text-center backdrop-blur-xl"
+        >
+          <Book className="h-12 w-12 text-indigo-400/80 mb-3" />
+          <p className="text-sm text-muted-foreground max-w-sm">
+            No lessons yet. Generate your first lesson above to get started.
+          </p>
+        </motion.div>
       )}
     </AppShell>
   );

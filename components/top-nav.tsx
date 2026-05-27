@@ -8,6 +8,7 @@ import { Search, Bell, Settings, Menu, Sun, Moon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
+import { useSession } from 'next-auth/react';
 
 interface SearchResult {
   type: string;
@@ -24,6 +25,10 @@ interface TopNavProps {
 
 export function TopNav({ sidebarOpen = true, onMenuClick }: TopNavProps) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isLoggedIn = !!session?.user;
+  const [isByoKey, setIsByoKey] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -45,6 +50,40 @@ export function TopNav({ sidebarOpen = true, onMenuClick }: TopNavProps) {
       setResults([]);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    // Check BYO key on mount
+    try {
+      const providerStr = localStorage.getItem('aetherlearn-ai-provider');
+      if (providerStr) {
+        const providerObj = JSON.parse(providerStr);
+        if (providerObj && typeof providerObj.apiKey === 'string' && providerObj.apiKey.trim() !== '') {
+          setIsByoKey(true);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse aetherlearn-ai-provider from localStorage', e);
+    }
+
+    // Fetch credits
+    async function fetchCredits() {
+      try {
+        const res = await fetch('/api/credits');
+        if (res.ok) {
+          const data = await res.json();
+          if (typeof data.credits === 'number') {
+            setCredits(data.credits);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch credits', e);
+      }
+    }
+
+    fetchCredits();
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -136,6 +175,28 @@ export function TopNav({ sidebarOpen = true, onMenuClick }: TopNavProps) {
         >
           {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </motion.button>
+
+        {isLoggedIn && (isByoKey || credits !== null) && (
+          <Link href="/settings" className="flex items-center">
+            <motion.span
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border backdrop-blur-md transition-colors cursor-pointer",
+                isByoKey
+                  ? "bg-purple-500/15 text-purple-400 border-purple-500/30 hover:bg-purple-500/25"
+                  : credits! < 5
+                  ? "bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25"
+                  : credits! < 10
+                  ? "bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25"
+                  : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25"
+              )}
+            >
+              {isByoKey ? 'Unlimited' : `${credits} credits`}
+            </motion.span>
+          </Link>
+        )}
+
         <motion.button
           type="button"
           className="relative hidden min-h-[44px] min-w-[44px] rounded-lg p-2 transition-colors hover:bg-white/10 sm:inline-flex"

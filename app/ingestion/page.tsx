@@ -184,7 +184,7 @@ export default function IngestionPage() {
   return (
     <AppShell
       title="Content Ingestion"
-      description="Paste a URL, text, or upload files. We chunk, embed via your AI provider, and store in SQLite for RAG."
+      description="Add any content — a website, document, or your own notes — and AetherLearn will turn it into a personal knowledge base you can learn from."
     >
       <div className="grid gap-8 lg:grid-cols-2">
         <motion.div

@@ -7,7 +7,7 @@ import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, Loader2, RotateCw, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, RotateCw, Sparkles, Layers } from 'lucide-react';
 import { useLearn, type FlashcardItem } from '@/hooks/use-lumina';
 import { logActivity } from '@/lib/activity-store';
 import type { ReviewQuality } from '@/lib/sm2';
@@ -264,6 +264,19 @@ export default function FlashcardsPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {displayCards.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.15] bg-white/[0.08] p-8 text-center backdrop-blur-xl"
+        >
+          <Layers className="h-12 w-12 text-indigo-400/80 mb-3" />
+          <p className="text-sm text-muted-foreground max-w-sm">
+            No flashcards yet. Generate flashcards from your content to start studying.
+          </p>
+        </motion.div>
       )}
     </AppShell>
   );

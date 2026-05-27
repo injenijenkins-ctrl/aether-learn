@@ -7,7 +7,7 @@ import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, RotateCcw, Sparkles } from 'lucide-react';
+import { Loader2, RotateCcw, Sparkles, HelpCircle } from 'lucide-react';
 import { useLearn, type Quiz, type QuizQuestion } from '@/hooks/use-lumina';
 import { logActivity } from '@/lib/activity-store';
 import { cn } from '@/lib/utils';
@@ -168,6 +168,19 @@ export default function QuizzesPage() {
             </Button>
           )}
         </div>
+      )}
+
+      {!quiz && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.15] bg-white/[0.08] p-8 text-center backdrop-blur-xl"
+        >
+          <HelpCircle className="h-12 w-12 text-indigo-400/80 mb-3" />
+          <p className="text-sm text-muted-foreground max-w-sm">
+            No quizzes yet. Test your knowledge by generating a quiz above.
+          </p>
+        </motion.div>
       )}
     </AppShell>
   );

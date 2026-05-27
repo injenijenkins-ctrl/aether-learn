@@ -23,7 +23,7 @@ export default function TutorPage() {
       id: '0',
       role: 'ai',
       content:
-        "Hi! I'm your AI tutor. Ask me anything about your ingested content—I'll use RAG to find relevant chunks and explain clearly.",
+        "Hi! Ask me anything — I'll teach you from your content, or answer from my own knowledge if you haven't added anything yet.",
     },
   ]);
   const [input, setInput] = useState('');

@@ -10,7 +10,7 @@ export const maxDuration = 60;
 const MASTER_PROVIDER = {
   apiKey: process.env.MASTER_AI_KEY || '',
   baseUrl: process.env.MASTER_AI_BASE_URL || 'https://openrouter.ai/api/v1',
-  model: process.env.MASTER_AI_MODEL || 'deepseek/deepseek-v4-flash:free',
+  model: process.env.MASTER_AI_MODEL || 'qwen/qwen3-8b:free',
   embeddingModel: 'text-embedding-3-small',
 };
 
