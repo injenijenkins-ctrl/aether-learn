@@ -4,9 +4,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Search, Bell, Settings, Menu } from 'lucide-react';
+import { Search, Bell, Settings, Menu, Sun, Moon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useTheme } from 'next-themes';
 
 interface SearchResult {
   type: string;
@@ -26,6 +27,7 @@ export function TopNav({ sidebarOpen = true, onMenuClick }: TopNavProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -124,6 +126,16 @@ export function TopNav({ sidebarOpen = true, onMenuClick }: TopNavProps) {
       </div>
 
       <div className="ml-auto flex items-center gap-2 md:gap-4">
+        <motion.button
+          type="button"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="hidden min-h-[44px] min-w-[44px] rounded-lg p-2 transition-colors hover:bg-white/10 sm:inline-flex items-center justify-center"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          aria-label="Toggle theme"
+        >
+          {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </motion.button>
         <motion.button
           type="button"
           className="relative hidden min-h-[44px] min-w-[44px] rounded-lg p-2 transition-colors hover:bg-white/10 sm:inline-flex"
