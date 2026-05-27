@@ -1,7 +1,4 @@
-import { NextResponse } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
-import { generateCompletion, parseProviderFromRequest } from '@/lib/ai-provider';
-import { getSupabase } from '@/lib/supabase';
+import { parseProviderFromRequest, streamCompletion } from '@/lib/ai-provider';
 import { retrieveContext } from '@/lib/rag';
 import { getUserId } from '@/lib/session';
 import { checkAndDeductCredit } from '@/lib/credits';
@@ -9,8 +6,6 @@ import { checkAndDeductCredit } from '@/lib/credits';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
-
-type Depth = 'beginner' | 'deeper' | 'real_world' | 'simpler';
 
 const MASTER_PROVIDER = {
   apiKey: process.env.MASTER_AI_KEY || '',
@@ -22,17 +17,16 @@ const MASTER_PROVIDER = {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { query, depth, userLevel } = body as {
-      query?: string;
-      depth?: Depth;
-      userLevel?: 'beginner' | 'intermediate' | 'advanced';
-    };
+    const { query } = body as { query?: string };
 
     if (!query || typeof query !== 'string') {
-      return NextResponse.json({ error: 'Query is required' }, { status: 400 });
+      return new Response(JSON.stringify({ error: 'Query is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // Determine provider
+    // Determine provider — BYO key or master key
     let provider;
     let usingMasterKey = false;
 
@@ -40,9 +34,9 @@ export async function POST(request: Request) {
       provider = parseProviderFromRequest(request, body);
     } catch {
       if (!MASTER_PROVIDER.apiKey) {
-        return NextResponse.json(
-          { error: 'No AI provider configured. Add your API key in Settings.' },
-          { status: 400 }
+        return new Response(
+          JSON.stringify({ error: 'No AI provider configured. Add your API key in Settings.' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
       provider = MASTER_PROVIDER;
@@ -52,66 +46,69 @@ export async function POST(request: Request) {
     // Check credits if using master key
     if (usingMasterKey) {
       const userId = await getUserId();
-      const { allowed, message } = await checkAndDeductCredit(userId);
+      const { allowed, remaining, message } = await checkAndDeductCredit(userId);
 
       if (!allowed) {
-        return NextResponse.json({ error: message }, { status: 429 });
+        return new Response(
+          JSON.stringify({ error: message }),
+          { status: 429, headers: { 'Content-Type': 'application/json' } }
+        );
       }
-    }
 
-    let depthLevel: Depth =
-      depth === 'deeper' || depth === 'real_world' || depth === 'simpler'
-        ? depth
-        : 'beginner';
+      const context = await retrieveContext(query, provider);
+      const systemPrompt = `You are a helpful AI tutor. Use the provided context to answer the student's question.
+Be clear, direct, and educational. End with a follow-up question.
+CONTEXT: ${context}`;
 
-    if (depth === 'simpler') depthLevel = 'beginner';
-    if (depth === 'deeper') depthLevel = 'deeper';
-
-    const level =
-      userLevel === 'intermediate' || userLevel === 'advanced'
-        ? userLevel
-        : 'beginner';
-
-    const context = await retrieveContext(query, provider);
-    const systemPrompt = `You are an expert tutor. Given this content, generate a structured lesson.
-Return ONLY valid JSON, no markdown fences:
-{
-  "title": "lesson title",
-  "explanation": "full explanation based on depth level",
-  "keyPoints": ["point 1", "point 2", "point 3"],
-  "commonMistakes": ["mistake 1", "mistake 2"],
-  "depth": "beginner|deeper|real_world"
-}
-Depth level: ${depthLevel}. Student proficiency: ${level}. Adjust vocabulary and complexity for ${level} learners.`;
-
-    const prompt = `Student question/topic: ${query}\n\nContext:\n${context}`;
-    const raw = await generateCompletion(prompt, provider, systemPrompt);
-
-    try {
-      const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
-      const lesson = JSON.parse(cleaned);
-
-      const userId = await getUserId();
-      const { error } = await getSupabase().from('lesson_history').insert({
-        id: uuidv4(),
-        user_id: userId,
-        title: lesson.title || query.slice(0, 80),
-        query,
-        depth: depthLevel,
-        created_at: new Date().toISOString(),
-      });
-
-      if (error) console.error('lesson_history insert failed:', error);
-
-      return NextResponse.json(lesson);
-    } catch {
-      return NextResponse.json(
-        { error: 'Failed to parse lesson' },
-        { status: 500 }
+      return new Response(
+        new ReadableStream({
+          async start(controller) {
+            const encoder = new TextEncoder();
+            try {
+              controller.enqueue(
+                encoder.encode(`\x00${JSON.stringify({ credits: remaining })}\x00`)
+              );
+              for await (const chunk of streamCompletion(query, provider, systemPrompt)) {
+                controller.enqueue(encoder.encode(chunk));
+              }
+              controller.close();
+            } catch (error) {
+              const msg = error instanceof Error ? error.message : 'Stream failed';
+              controller.enqueue(encoder.encode(`\n\nError: ${msg}`));
+              controller.close();
+            }
+          },
+        }),
+        { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
       );
     }
+
+    // BYO key path — no credit check
+    const context = await retrieveContext(query, provider);
+    const systemPrompt = `You are a helpful AI tutor. Use the provided context to answer the student's question.
+Be clear, direct, and educational. End with a follow-up question.
+CONTEXT: ${context}`;
+
+    return new Response(
+      new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          try {
+            for await (const chunk of streamCompletion(query, provider, systemPrompt)) {
+              controller.enqueue(encoder.encode(chunk));
+            }
+            controller.close();
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Stream failed';
+            controller.enqueue(encoder.encode(`\n\nError: ${msg}`));
+            controller.close();
+          }
+        },
+      }),
+      { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
+    );
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Lesson failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Chat failed';
+    return new Response(message, { status: 500 });
   }
 }

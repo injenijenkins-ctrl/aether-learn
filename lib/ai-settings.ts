@@ -41,7 +41,9 @@ export function maskApiKey(key: string): string {
 /** Payload sent to API routes alongside request data */
 export function providerPayload(
   settings: AIProviderConfig = loadAISettings()
-): { provider: AIProviderConfig } {
+): { provider?: AIProviderConfig } {
+  // Only include provider if API key is actually set
+  if (!settings.apiKey?.trim()) return {};
   return {
     provider: {
       apiKey: settings.apiKey.trim(),
@@ -57,6 +59,8 @@ export function providerPayload(
 export function providerHeaders(
   settings: AIProviderConfig = loadAISettings()
 ): Record<string, string> {
+  // Only send headers if API key is actually set
+  if (!settings.apiKey?.trim()) return {};
   return {
     'x-ai-api-key': settings.apiKey.trim(),
     'x-ai-base-url': settings.baseUrl.trim(),
