@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { CheckCircle2, Key, Save, XCircle } from 'lucide-react';
+import { CheckCircle2, Key, Loader2, Save, ShieldCheck, XCircle } from 'lucide-react';
 import {
   isAIConfigured,
   loadAISettings,
@@ -28,6 +28,24 @@ import {
   PROVIDER_PRESETS,
   type AIProviderConfig,
 } from '@/lib/ai-provider-types';
+
+const cardStyle = {
+  background: 'rgba(13,17,23,0.8)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  backdropFilter: 'blur(16px)',
+};
+
+const inputStyle = {
+  background: 'rgba(20,27,36,0.8)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  color: '#F0F4F8',
+};
+
+const gradientButtonStyle = {
+  background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)',
+  border: 'none',
+  color: '#ffffff',
+};
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AIProviderConfig>(DEFAULT_AI_PROVIDER);
@@ -139,14 +157,19 @@ export default function SettingsPage() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-2xl space-y-6"
+        className="max-w-3xl space-y-6"
       >
-        <div className="rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl">
-          <div className="mb-6 flex items-start gap-4">
-            <Key className="mt-1 h-6 w-6 shrink-0 text-indigo-400" />
+        <div className="rounded-2xl p-6" style={cardStyle}>
+          <div className="mb-7 flex items-start gap-4">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+              style={{ background: 'rgba(124,106,245,0.12)' }}
+            >
+              <Key className="h-6 w-6" style={{ color: '#7C6AF5' }} />
+            </div>
             <div>
-              <h2 className="text-lg font-semibold">AI Provider</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <h2 className="text-base font-semibold" style={{ color: '#F0F4F8' }}>AI Provider</h2>
+              <p className="mt-1 text-sm" style={{ color: '#8B9AB0' }}>
                 Settings are stored in your browser (localStorage) and sent with each
                 API request. Use any provider with an OpenAI-compatible REST API.
               </p>
@@ -154,12 +177,12 @@ export default function SettingsPage() {
                 {configured ? (
                   <>
                     <CheckCircle2 className="h-5 w-5 text-green-400" />
-                    <span className="text-sm text-green-400">Ready to use</span>
+                    <span className="text-sm" style={{ color: '#34D399' }}>Ready to use</span>
                   </>
                 ) : (
                   <>
                     <XCircle className="h-5 w-5 text-red-400" />
-                    <span className="text-sm text-red-400">
+                    <span className="text-sm" style={{ color: '#F87171' }}>
                       Complete all fields below
                     </span>
                   </>
@@ -170,12 +193,12 @@ export default function SettingsPage() {
 
           <div className="space-y-5">
             <div>
-              <Label>Quick preset</Label>
+              <Label style={{ color: '#8B9AB0' }}>Quick preset</Label>
               <Select value={preset} onValueChange={handlePreset}>
-                <SelectTrigger className="mt-2 border-white/10 bg-background/50">
+                <SelectTrigger className="mt-2 min-h-[44px] w-full" style={inputStyle}>
                   <SelectValue placeholder="Choose a provider" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent style={{ background: '#141B24', border: '1px solid rgba(255,255,255,0.08)' }}>
                   <SelectItem value="custom">Custom</SelectItem>
                   {PROVIDER_PRESETS.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
@@ -187,7 +210,7 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <Label htmlFor="apiKey">API Key</Label>
+              <Label htmlFor="apiKey" style={{ color: '#8B9AB0' }}>API Key</Label>
               <Input
                 id="apiKey"
                 type="password"
@@ -196,18 +219,19 @@ export default function SettingsPage() {
                   setSettings((s) => ({ ...s, apiKey: e.target.value }))
                 }
                 placeholder="sk-..."
-                className="mt-2 border-white/10 bg-background/50 font-mono text-sm"
+                className="mt-2 min-h-[44px] font-mono text-sm"
+                style={inputStyle}
                 autoComplete="off"
               />
               {saved && settings.apiKey && (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-xs" style={{ color: '#4A5568' }}>
                   Saved: {maskApiKey(settings.apiKey)}
                 </p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="baseUrl">Base URL</Label>
+              <Label htmlFor="baseUrl" style={{ color: '#8B9AB0' }}>Base URL</Label>
               <Input
                 id="baseUrl"
                 value={settings.baseUrl}
@@ -215,15 +239,16 @@ export default function SettingsPage() {
                   setSettings((s) => ({ ...s, baseUrl: e.target.value }))
                 }
                 placeholder="https://api.openai.com/v1"
-                className="mt-2 border-white/10 bg-background/50 font-mono text-sm"
+                className="mt-2 min-h-[44px] font-mono text-sm"
+                style={inputStyle}
               />
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs" style={{ color: '#4A5568' }}>
                 OpenAI-compatible root, usually ending in <code>/v1</code>
               </p>
             </div>
 
             <div>
-              <Label htmlFor="model">Model name</Label>
+              <Label htmlFor="model" style={{ color: '#8B9AB0' }}>Model name</Label>
               <Input
                 id="model"
                 value={settings.model}
@@ -231,15 +256,16 @@ export default function SettingsPage() {
                   setSettings((s) => ({ ...s, model: e.target.value }))
                 }
                 placeholder="gpt-4o"
-                className="mt-2 border-white/10 bg-background/50 font-mono text-sm"
+                className="mt-2 min-h-[44px] font-mono text-sm"
+                style={inputStyle}
               />
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs" style={{ color: '#4A5568' }}>
                 Chat/completions model (e.g. gpt-4o, claude-3-5-sonnet via OpenRouter)
               </p>
             </div>
 
             <div>
-              <Label htmlFor="embeddingModel">Embedding model (optional)</Label>
+              <Label htmlFor="embeddingModel" style={{ color: '#8B9AB0' }}>Embedding model (optional)</Label>
               <Input
                 id="embeddingModel"
                 value={settings.embeddingModel ?? ''}
@@ -250,9 +276,10 @@ export default function SettingsPage() {
                   }))
                 }
                 placeholder={DEFAULT_AI_PROVIDER.embeddingModel}
-                className="mt-2 border-white/10 bg-background/50 font-mono text-sm"
+                className="mt-2 min-h-[44px] font-mono text-sm"
+                style={inputStyle}
               />
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs" style={{ color: '#4A5568' }}>
                 Used for RAG ingestion. Default:{' '}
                 {DEFAULT_AI_PROVIDER.embeddingModel}
               </p>
@@ -261,7 +288,8 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button
                 onClick={handleSave}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 sm:w-auto"
+                className="min-h-[44px] w-full sm:w-auto"
+                style={gradientButtonStyle}
               >
                 <Save className="mr-2 h-4 w-4" />
                 Save settings
@@ -270,56 +298,74 @@ export default function SettingsPage() {
                 variant="outline"
                 onClick={handleTestConnection}
                 disabled={testing}
-                className="w-full sm:w-auto"
+                className="min-h-[44px] w-full sm:w-auto"
+                style={{ background: 'rgba(124,106,245,0.08)', border: '1px solid rgba(124,106,245,0.22)', color: '#F0F4F8' }}
               >
+                {testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {testing ? 'Testing...' : 'Test connection'}
               </Button>
             </div>
             {testResult && (
-              <p className="text-xs text-muted-foreground">{testResult}</p>
+              <p className="text-xs" style={{ color: '#8B9AB0' }}>{testResult}</p>
             )}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl">
-          <h3 className="mb-3 font-semibold">Example configurations</h3>
-          <ul className="space-y-3 text-sm text-muted-foreground">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="rounded-2xl p-6"
+          style={cardStyle}
+        >
+          <h3 className="mb-3 font-semibold" style={{ color: '#F0F4F8' }}>Example configurations</h3>
+          <ul className="space-y-3 text-sm" style={{ color: '#8B9AB0' }}>
             <li>
-              <strong className="text-foreground">OpenAI:</strong>{' '}
+              <strong style={{ color: '#F0F4F8' }}>OpenAI:</strong>{' '}
               <code className="text-xs">https://api.openai.com/v1</code> +{' '}
               <code className="text-xs">gpt-4o-mini</code>
             </li>
             <li>
-              <strong className="text-foreground">OpenRouter:</strong>{' '}
+              <strong style={{ color: '#F0F4F8' }}>OpenRouter:</strong>{' '}
               <code className="text-xs">https://openrouter.ai/api/v1</code> + model
               slug
             </li>
             <li>
-              <strong className="text-foreground">Ollama:</strong>{' '}
+              <strong style={{ color: '#F0F4F8' }}>Ollama:</strong>{' '}
               <code className="text-xs">http://localhost:11434/v1</code> + local
               model name
             </li>
           </ul>
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className="mt-4 text-sm" style={{ color: '#8B9AB0' }}>
             After saving, go to{' '}
-            <Link href="/ingestion" className="text-indigo-400 underline">
+            <Link href="/ingestion" className="underline" style={{ color: '#7C6AF5' }}>
               Ingestion
             </Link>{' '}
             to add content, then use Tutor, Lessons, or Quizzes.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="rounded-2xl border border-white/[0.15] bg-white/[0.06] p-6 text-sm text-muted-foreground">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.14 }}
+          className="rounded-2xl p-6 text-sm"
+          style={{ background: 'rgba(124,106,245,0.07)', border: '1px solid rgba(124,106,245,0.16)', color: '#8B9AB0' }}
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" style={{ color: '#7C6AF5' }} />
+            <span className="font-semibold" style={{ color: '#F0F4F8' }}>Storage and security</span>
+          </div>
           <p>
-            <strong className="text-foreground">Security:</strong> Your API key stays
+            <strong style={{ color: '#F0F4F8' }}>Security:</strong> Your API key stays
             in localStorage on this device and is sent to your Next.js server with each
             request. Do not share your browser profile on untrusted machines.
           </p>
           <p className="mt-2">
-            <strong className="text-foreground">Note:</strong> Ingested content and
+            <strong style={{ color: '#F0F4F8' }}>Note:</strong> Ingested content and
             embeddings are stored in your Supabase database.
           </p>
-        </div>
+        </motion.div>
       </motion.div>
     </AppShell>
   );

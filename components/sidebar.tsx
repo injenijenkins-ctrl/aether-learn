@@ -45,12 +45,7 @@ interface SidebarProps {
   onMobileClose?: () => void;
 }
 
-export function Sidebar({
-  open = true,
-  mobileOpen = false,
-  onToggle,
-  onMobileClose,
-}: SidebarProps) {
+export function Sidebar({ open = true, mobileOpen = false, onToggle, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const user = session?.user;
@@ -60,96 +55,142 @@ export function Sidebar({
       <motion.aside
         initial={{ x: -300 }}
         animate={{ x: 0 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
         className={cn(
-          'fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300',
+          'fixed left-0 top-0 z-40 flex h-screen flex-col transition-all duration-300',
           open ? 'w-64' : 'w-20',
           mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         )}
+        style={{
+          background: '#0D1117',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+        }}
       >
-        <div className="flex items-center justify-between border-b border-sidebar-border p-4">
+        {/* Logo / header */}
+        <div
+          className="flex items-center justify-between p-4"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        >
           {open && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex items-center gap-2"
+              transition={{ delay: 0.1 }}
+              className="flex items-center gap-2.5"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600">
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-lg"
+                style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)' }}
+              >
                 <span className="text-sm font-bold text-white">A</span>
               </div>
-              <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-blue-400 bg-clip-text font-bold text-transparent">
+              <span
+                className="font-bold text-base"
+                style={{
+                  background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
                 AetherLearn
               </span>
             </motion.div>
+          )}
+          {!open && (
+            <div
+              className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg"
+              style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)' }}
+            >
+              <span className="text-sm font-bold text-white">A</span>
+            </div>
           )}
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={onMobileClose}
-              className="min-h-[44px] min-w-[44px] rounded-lg p-2 hover:bg-white/10 md:hidden"
+              className="min-h-[44px] min-w-[44px] rounded-lg p-2 transition-colors hover:bg-white/[0.06] md:hidden"
               aria-label="Close sidebar"
             >
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4" style={{ color: '#8B9AB0' }} />
             </button>
             <button
               type="button"
               onClick={() => onToggle?.(!open)}
-              className="hidden min-h-[44px] min-w-[44px] rounded-lg p-2 hover:bg-white/10 md:block"
+              className="hidden min-h-[44px] min-w-[44px] rounded-lg p-2 transition-colors hover:bg-white/[0.06] md:flex items-center justify-center"
               aria-label="Toggle sidebar"
             >
-              {open ? (
-                <ChevronLeft className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
+              {open
+                ? <ChevronLeft className="h-4 w-4" style={{ color: '#8B9AB0' }} />
+                : <ChevronRight className="h-4 w-4" style={{ color: '#8B9AB0' }} />
+              }
             </button>
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        {/* Nav items */}
+        <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
           {navItems.map((item) => {
             const active = pathname === item.href;
             return (
               <Link key={item.href} href={item.href} onClick={onMobileClose}>
                 <motion.span
                   className={cn(
-                    'flex min-h-[44px] items-center gap-3 rounded-lg px-4 py-3 text-sidebar-foreground transition-all',
-                    active
-                      ? 'bg-sidebar-primary/20 text-sidebar-primary'
-                      : 'hover:bg-white/10'
+                    'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+                    !open && 'justify-center px-2'
                   )}
-                  whileHover={{ x: 4 }}
+                  style={
+                    active
+                      ? {
+                          background: 'rgba(124,106,245,0.15)',
+                          color: '#7C6AF5',
+                          borderLeft: '2px solid #7C6AF5',
+                        }
+                      : {
+                          color: '#8B9AB0',
+                          borderLeft: '2px solid transparent',
+                        }
+                  }
+                  whileHover={
+                    active
+                      ? {}
+                      : {
+                          backgroundColor: 'rgba(255,255,255,0.04)',
+                          color: '#F0F4F8',
+                          x: open ? 2 : 0,
+                        }
+                  }
                   whileTap={{ scale: 0.98 }}
                 >
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  {open && <span className="text-sm font-medium">{item.label}</span>}
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {open && <span>{item.label}</span>}
                 </motion.span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="border-t border-sidebar-border p-3">
-          <div
-            className={cn(
-              'flex items-center gap-3',
-              open ? 'flex-row' : 'flex-col'
-            )}
-          >
-            <Avatar className="h-9 w-9 shrink-0">
-              {user?.image ? (
-                <AvatarImage src={user.image} alt={user.name || 'User'} />
-              ) : null}
-              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-xs text-white">
+        {/* User footer */}
+        <div
+          className="p-3"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          <div className={cn('flex items-center gap-3', open ? 'flex-row' : 'flex-col')}>
+            <Avatar className="h-8 w-8 shrink-0">
+              {user?.image ? <AvatarImage src={user.image} alt={user.name || 'User'} /> : null}
+              <AvatarFallback
+                className="text-xs text-white"
+                style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)' }}
+              >
                 {user?.name?.charAt(0) || user?.email?.charAt(0) || 'A'}
               </AvatarFallback>
             </Avatar>
             {open && (
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
+                <p className="truncate text-sm font-medium" style={{ color: '#F0F4F8' }}>
                   {user?.name || 'Learner'}
                 </p>
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="truncate text-xs" style={{ color: '#4A5568' }}>
                   {user?.email || ''}
                 </p>
               </div>
@@ -159,11 +200,11 @@ export function Sidebar({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="min-h-[44px] min-w-[44px] shrink-0"
+                className="min-h-[44px] min-w-[44px] shrink-0 hover:bg-white/[0.06]"
                 onClick={() => signOut({ callbackUrl: '/login' })}
                 aria-label="Sign out"
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-4 w-4" style={{ color: '#8B9AB0' }} />
               </Button>
             )}
           </div>

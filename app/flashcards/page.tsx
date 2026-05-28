@@ -20,6 +20,12 @@ interface ReviewRow {
   topic?: string;
 }
 
+const cardStyle = {
+  background: 'rgba(13,17,23,0.8)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  backdropFilter: 'blur(16px)',
+};
+
 export default function FlashcardsPage() {
   const { generateFlashcards, loading } = useLearn();
   const [topic, setTopic] = useState('');
@@ -36,48 +42,31 @@ export default function FlashcardsPage() {
       const data = await res.json();
       setDueCards(data.due || []);
       const map: Record<string, string> = {};
-      for (const row of data.all || []) {
-        map[row.cardId] = row.id;
-      }
+      for (const row of data.all || []) map[row.cardId] = row.id;
       setReviewMap(map);
-    } catch {
-      setDueCards([]);
-    }
+    } catch { setDueCards([]); }
   }, []);
 
-  useEffect(() => {
-    loadReviews();
-  }, [loadReviews]);
+  useEffect(() => { loadReviews(); }, [loadReviews]);
 
   const handleGenerate = async () => {
-    if (!topic.trim()) {
-      toast.error('Enter a topic');
-      return;
-    }
+    if (!topic.trim()) { toast.error('Enter a topic'); return; }
     try {
       const generated = await generateFlashcards(topic.trim());
       setCards(generated);
       setIndex(0);
       setFlipped(false);
       setMode('browse');
-
       for (const card of generated) {
         await fetch('/api/flashcards/review', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cardId: card.id,
-            front: card.front,
-            back: card.back,
-            topic: topic.trim(),
-          }),
+          body: JSON.stringify({ cardId: card.id, front: card.front, back: card.back, topic: topic.trim() }),
         });
       }
       await loadReviews();
       toast.success(`Generated ${generated.length} flashcards`);
-    } catch {
-      toast.error('Failed to generate flashcards');
-    }
+    } catch { toast.error('Failed to generate flashcards'); }
   };
 
   const handleReview = async (quality: ReviewQuality) => {
@@ -94,7 +83,6 @@ export default function FlashcardsPage() {
       setFlipped(false);
       return;
     }
-
     const card = cards[index];
     if (!card) return;
     const reviewId = reviewMap[card.id];
@@ -112,38 +100,44 @@ export default function FlashcardsPage() {
   };
 
   const displayCards: { id: string; front: string; back: string }[] =
-    mode === 'due'
-      ? dueCards.map((d) => ({
-          id: d.cardId,
-          front: d.front,
-          back: d.back,
-        }))
-      : cards;
-
+    mode === 'due' ? dueCards.map((d) => ({ id: d.cardId, front: d.front, back: d.back })) : cards;
   const current = displayCards[index];
+
+  const reviewColors: Record<ReviewQuality, { bg: string; color: string; border: string }> = {
+    hard: { bg: 'rgba(248,113,113,0.1)', color: '#F87171', border: 'rgba(248,113,113,0.25)' },
+    good: { bg: 'rgba(251,191,36,0.1)', color: '#FBBF24', border: 'rgba(251,191,36,0.25)' },
+    easy: { bg: 'rgba(52,211,153,0.1)', color: '#34D399', border: 'rgba(52,211,153,0.25)' },
+  };
 
   return (
     <AppShell
       title="Flashcards"
       description="Flip cards with spaced repetition (SM-2) powered by your ingested content."
     >
+      {/* Due cards banner */}
       {dueCards.length > 0 && (
-        <div className="mb-8 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-6 backdrop-blur-xl">
+        <div
+          className="mb-8 rounded-2xl p-5"
+          style={{
+            background: 'rgba(251,191,36,0.08)',
+            border: '1px solid rgba(251,191,36,0.2)',
+          }}
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="font-semibold text-orange-300">Due for review</h2>
-              <p className="text-sm text-muted-foreground">
+              <h2 className="text-sm font-semibold" style={{ color: '#FBBF24' }}>Due for review</h2>
+              <p className="text-xs mt-0.5" style={{ color: '#8B9AB0' }}>
                 {dueCards.length} card{dueCards.length === 1 ? '' : 's'} due today
               </p>
             </div>
             <Button
-              variant="outline"
-              className="min-h-[44px]"
-              onClick={() => {
-                setMode('due');
-                setIndex(0);
-                setFlipped(false);
+              className="min-h-[44px] text-sm"
+              style={{
+                background: 'rgba(251,191,36,0.15)',
+                border: '1px solid rgba(251,191,36,0.3)',
+                color: '#FBBF24',
               }}
+              onClick={() => { setMode('due'); setIndex(0); setFlipped(false); }}
             >
               Study due cards
             </Button>
@@ -151,75 +145,79 @@ export default function FlashcardsPage() {
         </div>
       )}
 
-      <div className="mb-8 max-w-xl space-y-4 rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl">
+      {/* Generator */}
+      <div className="mb-8 max-w-xl space-y-4 rounded-2xl p-6" style={cardStyle}>
         <div>
-          <Label htmlFor="topic">Topic</Label>
+          <Label htmlFor="topic" style={{ color: '#8B9AB0' }}>Topic</Label>
           <Input
             id="topic"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder="e.g. Key vocabulary from my notes"
-            className="mt-2 min-h-[44px] border-white/10 bg-background/50"
+            className="mt-2 min-h-[44px]"
+            style={{ background: 'rgba(20,27,36,0.8)', border: '1px solid rgba(255,255,255,0.06)', color: '#F0F4F8' }}
           />
         </div>
-        <Button
-          onClick={handleGenerate}
-          disabled={loading}
-          className="min-h-[44px] bg-gradient-to-r from-indigo-600 to-purple-600"
-        >
-          {loading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Sparkles className="mr-2 h-4 w-4" />
-          )}
-          Generate Flashcards
-        </Button>
-        {mode === 'due' && (
+        <div className="flex gap-3">
           <Button
-            variant="ghost"
-            className="min-h-[44px]"
-            onClick={() => {
-              setMode('browse');
-              setIndex(0);
-            }}
+            onClick={handleGenerate}
+            disabled={loading}
+            className="min-h-[44px] text-white"
+            style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)', border: 'none' }}
           >
-            Back to all cards
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            Generate Flashcards
           </Button>
-        )}
+          {mode === 'due' && (
+            <Button
+              variant="ghost"
+              className="min-h-[44px]"
+              style={{ color: '#8B9AB0' }}
+              onClick={() => { setMode('browse'); setIndex(0); }}
+            >
+              Back to all
+            </Button>
+          )}
+        </div>
       </div>
 
+      {/* Card viewer */}
       {current && (
         <div className="mx-auto max-w-lg">
-          <p className="mb-4 text-center text-sm text-muted-foreground">
+          <p className="mb-4 text-center text-xs" style={{ color: '#4A5568' }}>
             Card {index + 1} of {displayCards.length}
-            {mode === 'due' && ' · Due review'}
+            {mode === 'due' && <span style={{ color: '#FBBF24' }}> · Due review</span>}
           </p>
+
           <motion.div
-            className="perspective-1000 cursor-pointer"
+            className="cursor-pointer"
+            style={{ perspective: 1000 }}
             onClick={() => setFlipped(!flipped)}
             whileTap={{ scale: 0.98 }}
           >
             <motion.div
               animate={{ rotateY: flipped ? 180 : 0 }}
-              transition={{ duration: 0.5 }}
-              className="relative min-h-[240px] rounded-2xl border border-white/[0.15] bg-gradient-to-br from-indigo-900/40 to-purple-900/40 p-8 backdrop-blur-xl"
-              style={{ transformStyle: 'preserve-3d' }}
+              transition={{ duration: 0.45 }}
+              className="relative min-h-[220px] rounded-2xl"
+              style={{
+                transformStyle: 'preserve-3d',
+                background: 'linear-gradient(135deg, rgba(124,106,245,0.1) 0%, rgba(91,141,245,0.08) 100%)',
+                border: '1px solid rgba(124,106,245,0.2)',
+              }}
             >
               <div
-                className="absolute inset-0 flex items-center justify-center p-6 text-center"
-                style={{
-                  backfaceVisibility: 'hidden',
-                  transform: flipped ? 'rotateY(180deg)' : 'none',
-                }}
+                className="absolute inset-0 flex items-center justify-center p-8 text-center"
+                style={{ backfaceVisibility: 'hidden' }}
               >
-                <p className="text-lg font-semibold">
+                <p className="text-base font-semibold" style={{ color: '#F0F4F8' }}>
                   {flipped ? current.back : current.front}
                 </p>
               </div>
             </motion.div>
           </motion.div>
-          <p className="mt-2 text-center text-xs text-muted-foreground">
-            Click to flip · <RotateCw className="inline h-3 w-3" />
+
+          <p className="mt-2 text-center text-xs flex items-center justify-center gap-1" style={{ color: '#4A5568' }}>
+            Click to flip <RotateCw className="h-3 w-3" />
           </p>
 
           {flipped && (
@@ -227,8 +225,12 @@ export default function FlashcardsPage() {
               {(['hard', 'good', 'easy'] as ReviewQuality[]).map((q) => (
                 <Button
                   key={q}
-                  variant="outline"
-                  className="min-h-[44px] capitalize"
+                  className="min-h-[44px] capitalize text-sm font-semibold"
+                  style={{
+                    background: reviewColors[q].bg,
+                    border: `1px solid ${reviewColors[q].border}`,
+                    color: reviewColors[q].color,
+                  }}
                   onClick={() => handleReview(q)}
                 >
                   {q}
@@ -237,44 +239,44 @@ export default function FlashcardsPage() {
             </div>
           )}
 
-          <div className="mt-6 flex justify-between gap-4">
+          <div className="mt-5 flex justify-between gap-4">
             <Button
-              variant="outline"
               className="min-h-[44px]"
+              style={{ background: 'rgba(20,27,36,0.8)', border: '1px solid rgba(255,255,255,0.06)', color: '#F0F4F8' }}
               disabled={index === 0}
-              onClick={() => {
-                setIndex((i) => i - 1);
-                setFlipped(false);
-              }}
+              onClick={() => { setIndex((i) => i - 1); setFlipped(false); }}
             >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              Previous
+              <ChevronLeft className="mr-1 h-4 w-4" /> Previous
             </Button>
             <Button
-              variant="outline"
               className="min-h-[44px]"
+              style={{ background: 'rgba(20,27,36,0.8)', border: '1px solid rgba(255,255,255,0.06)', color: '#F0F4F8' }}
               disabled={index >= displayCards.length - 1}
-              onClick={() => {
-                setIndex((i) => i + 1);
-                setFlipped(false);
-              }}
+              onClick={() => { setIndex((i) => i + 1); setFlipped(false); }}
             >
-              Next
-              <ChevronRight className="ml-1 h-4 w-4" />
+              Next <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
       )}
 
+      {/* Empty state */}
       {displayCards.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.15] bg-white/[0.08] p-8 text-center backdrop-blur-xl"
+          className="flex flex-col items-center justify-center rounded-2xl p-12 text-center"
+          style={cardStyle}
         >
-          <Layers className="h-12 w-12 text-indigo-400/80 mb-3" />
-          <p className="text-sm text-muted-foreground max-w-sm">
-            No flashcards yet. Generate flashcards from your content to start studying.
+          <div
+            className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
+            style={{ background: 'rgba(124,106,245,0.12)' }}
+          >
+            <Layers className="h-7 w-7" style={{ color: '#7C6AF5' }} />
+          </div>
+          <p className="text-sm font-medium" style={{ color: '#F0F4F8' }}>No flashcards yet</p>
+          <p className="mt-1 text-xs max-w-xs" style={{ color: '#4A5568' }}>
+            Generate flashcards from your content to start studying.
           </p>
         </motion.div>
       )}

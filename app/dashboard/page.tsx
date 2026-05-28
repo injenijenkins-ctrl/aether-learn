@@ -13,7 +13,6 @@ import {
   YAxis,
 } from 'recharts';
 import { AppShell } from '@/components/app-shell';
-import { Button } from '@/components/ui/button';
 import {
   ArrowRight,
   BookOpen,
@@ -36,6 +35,12 @@ const chartData = [
   { day: 'Sun', lessons: 4 },
 ];
 
+const cardStyle = {
+  background: 'rgba(13,17,23,0.8)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  backdropFilter: 'blur(16px)',
+};
+
 export default function DashboardPage() {
   const { listResources } = useIngest();
   const [resources, setResources] = useState<IngestedResource[]>([]);
@@ -54,25 +59,56 @@ export default function DashboardPage() {
       label: 'Resources Ingested',
       value: resources.length || stats.resourcesIngested,
       icon: Upload,
-      color: 'text-indigo-400',
+      color: '#7C6AF5',
+      bg: 'rgba(124,106,245,0.12)',
     },
     {
       label: 'Lessons Generated',
       value: stats.lessonsGenerated,
       icon: BookOpen,
-      color: 'text-purple-400',
+      color: '#5B8DF5',
+      bg: 'rgba(91,141,245,0.12)',
     },
     {
       label: 'Last Quiz Score',
       value: stats.quizScore ? `${stats.quizScore}%` : '—',
       icon: HelpCircle,
-      color: 'text-green-400',
+      color: '#34D399',
+      bg: 'rgba(52,211,153,0.12)',
     },
     {
       label: 'Day Streak',
       value: stats.streak,
       icon: Flame,
-      color: 'text-orange-400',
+      color: '#FBBF24',
+      bg: 'rgba(251,191,36,0.12)',
+    },
+  ];
+
+  const quickActions = [
+    {
+      href: '/ingestion',
+      icon: Zap,
+      title: 'Ingest Content',
+      desc: 'URL, PDF, text, or audio',
+      color: '#7C6AF5',
+      bg: 'rgba(124,106,245,0.12)',
+    },
+    {
+      href: '/tutor',
+      icon: Wand2,
+      title: 'AI Tutor',
+      desc: 'Chat with RAG context',
+      color: '#5B8DF5',
+      bg: 'rgba(91,141,245,0.12)',
+    },
+    {
+      href: '/lessons',
+      icon: BookOpen,
+      title: 'Generate Lesson',
+      desc: 'Structured explanations',
+      color: '#34D399',
+      bg: 'rgba(52,211,153,0.12)',
     },
   ];
 
@@ -81,102 +117,127 @@ export default function DashboardPage() {
       title="Dashboard"
       description="Your learning command center — ingest content, learn, and track progress."
     >
+      {/* Welcome banner for new users */}
       {resources.length === 0 && (
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/40 to-indigo-950/40 p-6 backdrop-blur-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+          className="mb-8 rounded-2xl p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+          style={{
+            background: 'linear-gradient(135deg, rgba(124,106,245,0.12) 0%, rgba(91,141,245,0.08) 100%)',
+            border: '1px solid rgba(124,106,245,0.2)',
+          }}
         >
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-indigo-200">Welcome to AetherLearn!</h2>
-            <p className="text-sm text-indigo-200/80">
+            <h2 className="text-base font-bold" style={{ color: '#F0F4F8' }}>
+              Welcome to AetherLearn! 👋
+            </h2>
+            <p className="text-sm" style={{ color: '#8B9AB0' }}>
               Start by adding some content — paste a URL, upload a file, or type your notes.
             </p>
           </div>
           <Link href="/ingestion">
-            <Button className="min-h-[44px] bg-gradient-to-r from-indigo-600 to-purple-600 text-white shrink-0">
+            <motion.span
+              className="inline-flex h-10 items-center gap-2 rounded-lg px-5 text-sm font-semibold text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)' }}
+              whileHover={{ opacity: 0.9 }}
+              whileTap={{ scale: 0.97 }}
+            >
               Get Started
-            </Button>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </motion.span>
           </Link>
         </motion.div>
       )}
 
+      {/* Stat cards */}
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((card, i) => (
           <motion.div
             key={card.label}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-            className="rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl"
+            transition={{ delay: i * 0.07 }}
+            className="rounded-2xl p-5"
+            style={cardStyle}
           >
-            <card.icon className={`mb-3 h-6 w-6 ${card.color}`} />
-            <p className="text-2xl font-bold">{card.value}</p>
-            <p className="text-sm text-muted-foreground">{card.label}</p>
+            <div
+              className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl"
+              style={{ background: card.bg }}
+            >
+              <card.icon className="h-5 w-5" style={{ color: card.color }} />
+            </div>
+            <p className="text-2xl font-bold" style={{ color: '#F0F4F8' }}>{card.value}</p>
+            <p className="mt-0.5 text-xs" style={{ color: '#8B9AB0' }}>{card.label}</p>
           </motion.div>
         ))}
       </div>
 
+      {/* Quick actions */}
       <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Link href="/ingestion" className="md:col-span-1">
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            className="group h-full rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl"
-          >
-            <Zap className="mb-4 h-8 w-8 text-indigo-400" />
-            <h3 className="font-semibold">Ingest Content</h3>
-            <p className="mt-1 text-sm text-muted-foreground">URL or paste text</p>
-            <ArrowRight className="mt-4 h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
-          </motion.div>
-        </Link>
-        <Link href="/tutor">
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            className="group h-full rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl"
-          >
-            <Wand2 className="mb-4 h-8 w-8 text-purple-400" />
-            <h3 className="font-semibold">AI Tutor</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Chat with RAG context</p>
-          </motion.div>
-        </Link>
-        <Link href="/lessons">
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            className="group h-full rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl"
-          >
-            <BookOpen className="mb-4 h-8 w-8 text-blue-400" />
-            <h3 className="font-semibold">Generate Lesson</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Structured explanations</p>
-          </motion.div>
-        </Link>
+        {quickActions.map((action, i) => (
+          <Link key={action.href} href={action.href}>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.28 + i * 0.07 }}
+              className="group h-full rounded-2xl p-5 cursor-pointer"
+              style={cardStyle}
+              whileHover={{
+                borderColor: 'rgba(124,106,245,0.25)',
+                background: 'rgba(20,27,36,0.9)',
+              }}
+            >
+              <div
+                className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl"
+                style={{ background: action.bg }}
+              >
+                <action.icon className="h-5 w-5" style={{ color: action.color }} />
+              </div>
+              <h3 className="font-semibold text-sm" style={{ color: '#F0F4F8' }}>{action.title}</h3>
+              <p className="mt-1 text-xs" style={{ color: '#8B9AB0' }}>{action.desc}</p>
+              <ArrowRight
+                className="mt-3 h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
+                style={{ color: '#7C6AF5' }}
+              />
+            </motion.div>
+          </Link>
+        ))}
       </div>
 
+      {/* Charts + Activity */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl">
-          <h2 className="mb-4 text-lg font-semibold">Weekly Learning Activity</h2>
-          <div className="h-64 w-full min-w-0">
+        {/* Chart */}
+        <div className="rounded-2xl p-6" style={cardStyle}>
+          <h2 className="mb-4 text-sm font-semibold" style={{ color: '#F0F4F8' }}>
+            Weekly Learning Activity
+          </h2>
+          <div className="h-56 w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorLessons" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#7C6AF5" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#7C6AF5" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2d3748" />
-                <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} />
-                <YAxis stroke="#94a3b8" fontSize={12} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="day" stroke="#4A5568" fontSize={11} tickLine={false} />
+                <YAxis stroke="#4A5568" fontSize={11} tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{
-                    background: '#1a1f3a',
-                    border: '1px solid #2d3748',
-                    borderRadius: '8px',
+                    background: '#141B24',
+                    border: '1px solid rgba(124,106,245,0.2)',
+                    borderRadius: '10px',
+                    color: '#F0F4F8',
+                    fontSize: 12,
                   }}
                 />
                 <Area
                   type="monotone"
                   dataKey="lessons"
-                  stroke="#6366f1"
+                  stroke="#7C6AF5"
+                  strokeWidth={2}
                   fill="url(#colorLessons)"
                 />
               </AreaChart>
@@ -184,21 +245,33 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl">
-          <h2 className="mb-4 text-lg font-semibold">Recent Activity</h2>
+        {/* Recent Activity */}
+        <div className="rounded-2xl p-6" style={cardStyle}>
+          <h2 className="mb-4 text-sm font-semibold" style={{ color: '#F0F4F8' }}>
+            Recent Activity
+          </h2>
           {activity.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No activity yet. Ingest content or generate a lesson to get started.
-            </p>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <p className="text-sm" style={{ color: '#4A5568' }}>
+                No activity yet. Ingest content or generate a lesson to get started.
+              </p>
+            </div>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-2">
               {activity.map((item) => (
                 <li
                   key={item.id}
-                  className="flex items-center justify-between rounded-lg bg-background/40 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm"
+                  style={{ background: 'rgba(255,255,255,0.03)' }}
                 >
-                  <span>{item.title}</span>
-                  <span className="text-xs capitalize text-muted-foreground">
+                  <span style={{ color: '#F0F4F8' }}>{item.title}</span>
+                  <span
+                    className="rounded-full px-2 py-0.5 text-xs capitalize"
+                    style={{
+                      background: 'rgba(124,106,245,0.12)',
+                      color: '#7C6AF5',
+                    }}
+                  >
                     {item.type}
                   </span>
                 </li>
@@ -208,26 +281,42 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Ingested Resources */}
       {resources.length > 0 && (
         <div className="mt-8">
-          <h2 className="mb-4 text-lg font-semibold">Ingested Resources</h2>
+          <h2 className="mb-4 text-sm font-semibold" style={{ color: '#F0F4F8' }}>
+            Ingested Resources
+          </h2>
           <div className="grid gap-3 md:grid-cols-2">
             {resources.slice(0, 4).map((r) => (
               <div
                 key={r.id}
-                className="rounded-xl border border-white/10 bg-background/40 p-4"
+                className="rounded-xl p-4"
+                style={{
+                  background: 'rgba(13,17,23,0.6)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }}
               >
-                <p className="font-medium">{r.title}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm font-medium" style={{ color: '#F0F4F8' }}>{r.title}</p>
+                <p className="mt-0.5 text-xs" style={{ color: '#4A5568' }}>
                   {r.type} · {r.chunkCount} chunks
                 </p>
               </div>
             ))}
           </div>
           <Link href="/ingestion" className="mt-4 inline-block">
-            <Button variant="outline" size="sm">
-              View all
-            </Button>
+            <motion.span
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg px-4 text-xs font-medium"
+              style={{
+                background: 'rgba(124,106,245,0.1)',
+                border: '1px solid rgba(124,106,245,0.2)',
+                color: '#7C6AF5',
+              }}
+              whileHover={{ background: 'rgba(124,106,245,0.18)' }}
+            >
+              View all resources
+              <ArrowRight className="h-3 w-3" />
+            </motion.span>
           </Link>
         </div>
       )}

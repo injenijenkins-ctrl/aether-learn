@@ -15,11 +15,33 @@ import {
   Upload,
   Mic,
   FileUp,
+  Database,
 } from 'lucide-react';
 import { useIngest, type IngestedResource } from '@/hooks/use-lumina';
 import { logActivity } from '@/lib/activity-store';
 
 type TabId = 'url' | 'text' | 'file' | 'audio';
+
+const cardStyle = {
+  background: 'rgba(13,17,23,0.8)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  backdropFilter: 'blur(16px)',
+};
+
+const inputStyle = {
+  background: 'rgba(20,27,36,0.8)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  color: '#F0F4F8',
+};
+
+const textareaClass =
+  'w-full resize-none rounded-xl p-4 text-sm outline-none transition-colors focus:border-[#7C6AF5]/60 focus:ring-2 focus:ring-[#7C6AF5]/20';
+
+const gradientButtonStyle = {
+  background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)',
+  border: 'none',
+  color: '#ffffff',
+};
 
 export default function IngestionPage() {
   const {
@@ -186,23 +208,41 @@ export default function IngestionPage() {
       title="Content Ingestion"
       description="Add any content — a website, document, or your own notes — and AetherLearn will turn it into a personal knowledge base you can learn from."
     >
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl"
+          className="rounded-2xl p-6"
+          style={cardStyle}
         >
-          <div className="mb-6 flex flex-wrap gap-2 border-b border-white/10">
+          <div className="mb-7">
+            <div
+              className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-2xl"
+              style={{ background: 'rgba(124,106,245,0.12)' }}
+            >
+              <Upload className="h-5 w-5" style={{ color: '#7C6AF5' }} />
+            </div>
+            <h2 className="text-base font-semibold" style={{ color: '#F0F4F8' }}>Add learning material</h2>
+            <p className="mt-1 text-sm" style={{ color: '#8B9AB0' }}>
+              Bring in sources, notes, files, or media transcripts for the rest of the app.
+            </p>
+          </div>
+
+          <div
+            className="mb-6 grid grid-cols-2 gap-2 rounded-2xl p-1 sm:grid-cols-4"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+          >
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex min-h-[44px] items-center gap-2 border-b-2 px-3 pb-3 text-sm font-medium transition-colors ${
+                className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors"
+                style={
                   activeTab === tab.id
-                    ? 'border-indigo-500 text-indigo-400'
-                    : 'border-transparent text-muted-foreground'
-                }`}
+                    ? { background: 'rgba(124,106,245,0.16)', color: '#F0F4F8', border: '1px solid rgba(124,106,245,0.24)' }
+                    : { color: '#8B9AB0', border: '1px solid transparent' }
+                }
               >
                 <tab.icon className="h-4 w-4 shrink-0" />
                 <span className="hidden sm:inline">{tab.label}</span>
@@ -215,17 +255,19 @@ export default function IngestionPage() {
 
           {activeTab === 'url' && (
             <div className="space-y-4">
-              <label className="text-sm font-medium">Learning Resource URL</label>
+              <label className="text-sm font-medium" style={{ color: '#8B9AB0' }}>Learning Resource URL</label>
               <Input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://example.com/article"
-                className="min-h-[44px] border-white/10 bg-background/50"
+                className="min-h-[44px]"
+                style={inputStyle}
               />
               <Button
                 onClick={handleUrlIngest}
                 disabled={loading}
-                className="min-h-[44px] w-full bg-gradient-to-r from-indigo-600 to-purple-600"
+                className="min-h-[44px] w-full"
+                style={gradientButtonStyle}
               >
                 {loading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -239,27 +281,30 @@ export default function IngestionPage() {
 
           {activeTab === 'text' && (
             <div className="space-y-4">
-              <label className="text-sm font-medium">Title</label>
+              <label className="text-sm font-medium" style={{ color: '#8B9AB0' }}>Title</label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="My study notes"
-                className="min-h-[44px] border-white/10 bg-background/50"
+                className="min-h-[44px]"
+                style={inputStyle}
               />
-              <label className="text-sm font-medium">Content</label>
+              <label className="text-sm font-medium" style={{ color: '#8B9AB0' }}>Content</label>
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Paste your learning material..."
-                className="h-48 w-full resize-none rounded-lg border border-white/10 bg-background/50 p-4 text-sm focus:border-indigo-500/50 focus:outline-none"
+                className={`${textareaClass} h-48`}
+                style={inputStyle}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ color: '#4A5568' }}>
                 Minimum 51 characters ({text.length} entered)
               </p>
               <Button
                 onClick={handleTextIngest}
                 disabled={loading}
-                className="min-h-[44px] w-full bg-gradient-to-r from-indigo-600 to-purple-600"
+                className="min-h-[44px] w-full"
+                style={gradientButtonStyle}
               >
                 {loading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -273,32 +318,35 @@ export default function IngestionPage() {
 
           {activeTab === 'file' && (
             <div className="space-y-4">
-              <label className="text-sm font-medium">PDF, TXT, or DOCX (max 10MB)</label>
+              <label className="text-sm font-medium" style={{ color: '#8B9AB0' }}>PDF, TXT, or DOCX (max 10MB)</label>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".pdf,.txt,.docx"
-                className="block w-full text-sm text-muted-foreground file:mr-4 file:min-h-[44px] file:rounded-lg file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-white"
+                className="block w-full rounded-xl border p-2 text-sm file:mr-4 file:min-h-[40px] file:rounded-lg file:border-0 file:bg-[#7C6AF5] file:px-4 file:py-2 file:text-white"
+                style={{ ...inputStyle, borderColor: 'rgba(255,255,255,0.06)' }}
                 onChange={handleFileSelect}
               />
               {fileName && (
-                <p className="text-sm text-indigo-300">
+                <p className="text-sm" style={{ color: '#7C6AF5' }}>
                   <Upload className="mr-1 inline h-4 w-4" />
                   {fileName}
                   {uploadProgress > 0 && ` · ${uploadProgress}%`}
                 </p>
               )}
-              <label className="text-sm font-medium">Title (optional)</label>
+              <label className="text-sm font-medium" style={{ color: '#8B9AB0' }}>Title (optional)</label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Document title"
-                className="min-h-[44px] border-white/10 bg-background/50"
+                className="min-h-[44px]"
+                style={inputStyle}
               />
               <Button
                 onClick={handleFileIngest}
                 disabled={loading || !selectedFile}
-                className="min-h-[44px] w-full bg-gradient-to-r from-indigo-600 to-purple-600"
+                className="min-h-[44px] w-full"
+                style={gradientButtonStyle}
               >
                 {loading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -312,14 +360,15 @@ export default function IngestionPage() {
 
           {activeTab === 'audio' && (
             <div className="space-y-4">
-              <label className="text-sm font-medium">
+              <label className="text-sm font-medium" style={{ color: '#8B9AB0' }}>
                 MP3, MP4, WAV, M4A, WEBM (max 25MB)
               </label>
               <input
                 ref={audioInputRef}
                 type="file"
                 accept=".mp3,.mp4,.wav,.m4a,.webm,audio/*,video/*"
-                className="block w-full text-sm text-muted-foreground file:mr-4 file:min-h-[44px] file:rounded-lg file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-white"
+                className="block w-full rounded-xl border p-2 text-sm file:mr-4 file:min-h-[40px] file:rounded-lg file:border-0 file:bg-[#7C6AF5] file:px-4 file:py-2 file:text-white"
+                style={{ ...inputStyle, borderColor: 'rgba(255,255,255,0.06)' }}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   setAudioFile(f || null);
@@ -327,13 +376,14 @@ export default function IngestionPage() {
                 }}
               />
               {audioFile && (
-                <p className="text-sm text-indigo-300">{audioFile.name}</p>
+                <p className="text-sm" style={{ color: '#7C6AF5' }}>{audioFile.name}</p>
               )}
               <Button
                 onClick={handleTranscribe}
                 disabled={transcribing || loading || !audioFile}
                 variant="outline"
                 className="min-h-[44px] w-full"
+                style={{ background: 'rgba(124,106,245,0.08)', border: '1px solid rgba(124,106,245,0.22)', color: '#F0F4F8' }}
               >
                 {transcribing || loading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -344,16 +394,18 @@ export default function IngestionPage() {
               </Button>
               {transcribedText && (
                 <div className="space-y-3">
-                  <label className="text-sm font-medium">Transcription preview</label>
+                  <label className="text-sm font-medium" style={{ color: '#8B9AB0' }}>Transcription preview</label>
                   <textarea
                     readOnly
                     value={transcribedText}
-                    className="h-40 w-full resize-none rounded-lg border border-white/10 bg-background/50 p-4 text-sm"
+                    className={`${textareaClass} h-40`}
+                    style={inputStyle}
                   />
                   <Button
                     onClick={handleConfirmIngestTranscript}
                     disabled={loading}
-                    className="min-h-[44px] w-full bg-gradient-to-r from-indigo-600 to-purple-600"
+                    className="min-h-[44px] w-full"
+                    style={gradientButtonStyle}
                   >
                     {loading ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -368,22 +420,47 @@ export default function IngestionPage() {
           )}
         </motion.div>
 
-        <div className="rounded-2xl border border-white/[0.15] bg-white/[0.08] p-6 backdrop-blur-xl">
-          <h2 className="mb-4 text-lg font-semibold">Ingested Resources</h2>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="rounded-2xl p-6"
+          style={cardStyle}
+        >
+          <div className="mb-5 flex items-start gap-4">
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+              style={{ background: 'rgba(91,141,245,0.12)' }}
+            >
+              <Database className="h-5 w-5" style={{ color: '#5B8DF5' }} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold" style={{ color: '#F0F4F8' }}>Ingested Resources</h2>
+              <p className="mt-1 text-sm" style={{ color: '#8B9AB0' }}>Your active knowledge base for lessons, chat, and quizzes.</p>
+            </div>
+          </div>
           {resources.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <div
+              className="rounded-2xl p-6 text-sm"
+              style={{ background: 'rgba(255,255,255,0.03)', color: '#8B9AB0', border: '1px solid rgba(255,255,255,0.05)' }}
+            >
               No resources yet. Ingest content to power lessons and chat.
-            </p>
+            </div>
           ) : (
             <ul className="space-y-3">
-              {resources.map((r) => (
-                <li
+              {resources.map((r, i) => (
+                <motion.li
                   key={r.id}
-                  className="flex items-start justify-between gap-3 rounded-xl bg-background/40 p-4"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  className="flex items-start justify-between gap-3 rounded-xl p-4"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+                  whileHover={{ borderColor: 'rgba(124,106,245,0.22)', background: 'rgba(20,27,36,0.72)' }}
                 >
                   <div className="min-w-0">
-                    <p className="font-medium break-words">{r.title}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-medium break-words" style={{ color: '#F0F4F8' }}>{r.title}</p>
+                    <p className="text-xs" style={{ color: '#8B9AB0' }}>
                       {r.type} · {r.chunkCount} chunks ·{' '}
                       {new Date(r.createdAt).toLocaleString()}
                     </p>
@@ -398,11 +475,11 @@ export default function IngestionPage() {
                   >
                     <Trash2 className="h-4 w-4 text-red-400" />
                   </Button>
-                </li>
+                </motion.li>
               ))}
             </ul>
           )}
-        </div>
+        </motion.div>
       </div>
     </AppShell>
   );
