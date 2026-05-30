@@ -5,6 +5,7 @@ import { getSupabase } from '@/lib/supabase';
 import { getUserId } from '@/lib/session';
 import { vectorStore } from '@/lib/vector-store';
 import { checkAndDeductCredit } from '@/lib/credits';
+import { retrieveContextWithSources } from '@/lib/rag';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -102,6 +103,7 @@ export async function POST(request: Request) {
     const resourceList = resources
       .map((r) => `- ${r.title} (${r.type})`)
       .join('\n');
+    const { context, sources } = await retrieveContextWithSources(targetTopics, provider);
 
     const systemPrompt = `You are a study coach. Create a 7-day weekly study plan as JSON only:
 {
@@ -118,7 +120,8 @@ export async function POST(request: Request) {
 Study goal: ${studyGoal}. Daily budget: ${dailyMinutes} minutes. Target topics: ${targetTopics}.`;
 
     const prompt = `Ingested resources:\n${resourceList || 'No resources yet — use target topics only.'}`;
-    const raw = await generateCompletion(prompt, provider, systemPrompt);
+    const studyContextPrompt = `${prompt}\n\nRelevant source context:\n${context}`;
+    const raw = await generateCompletion(studyContextPrompt, provider, systemPrompt);
     const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
     const parsed = JSON.parse(cleaned) as { days: unknown[] };
 
@@ -145,6 +148,7 @@ Study goal: ${studyGoal}. Daily budget: ${dailyMinutes} minutes. Target topics: 
       targetTopics: targetTopics.trim(),
       studyGoal: studyGoal.trim(),
       days: parsed.days,
+      sources,
       createdAt,
     });
   } catch (error) {

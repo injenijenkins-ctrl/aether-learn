@@ -8,6 +8,7 @@ import { Search, Bell, Settings, Menu } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useSession } from 'next-auth/react';
+import { CommandPalette } from '@/components/command-palette';
 
 interface SearchResult {
   type: string;
@@ -84,9 +85,11 @@ export function TopNav({ sidebarOpen = true, onMenuClick }: TopNavProps) {
     if (!isLoggedIn || (!isByoKey && credits === null)) return null;
     if (isByoKey) {
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border"
+        <span className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-full border px-2 text-xs font-semibold sm:px-3"
           style={{ background: 'rgba(124,106,245,0.12)', color: '#7C6AF5', borderColor: 'rgba(124,106,245,0.25)' }}>
-          ∞ Unlimited
+          <span aria-hidden="true">∞</span>
+          <span className="hidden sm:inline">Unlimited</span>
+          <span className="sr-only">Unlimited credits</span>
         </span>
       );
     }
@@ -98,8 +101,9 @@ export function TopNav({ sidebarOpen = true, onMenuClick }: TopNavProps) {
         ? { background: 'rgba(251,191,36,0.12)', color: '#FBBF24', borderColor: 'rgba(251,191,36,0.25)' }
         : { background: 'rgba(52,211,153,0.12)', color: '#34D399', borderColor: 'rgba(52,211,153,0.25)' };
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border" style={style}>
-        {c} credits
+      <span className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-full border px-2 text-xs font-semibold sm:px-3" style={style}>
+        <span>{c}</span>
+        <span className="hidden sm:inline">credits</span>
       </span>
     );
   };
@@ -110,7 +114,7 @@ export function TopNav({ sidebarOpen = true, onMenuClick }: TopNavProps) {
       animate={{ y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
       className={cn(
-        'fixed top-0 right-0 z-20 flex h-16 items-center justify-between px-4 md:px-6',
+        'fixed top-0 right-0 z-20 flex h-16 min-w-0 items-center justify-between gap-1 px-3 sm:gap-2 sm:px-4 md:px-6',
         sidebarOpen ? 'md:left-64' : 'md:left-20',
         'left-0'
       )}
@@ -125,22 +129,24 @@ export function TopNav({ sidebarOpen = true, onMenuClick }: TopNavProps) {
       <button
         type="button"
         onClick={onMenuClick}
-        className="min-h-[44px] min-w-[44px] rounded-lg p-2 transition-colors hover:bg-white/[0.06] md:hidden"
+        className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg p-2 transition-colors hover:bg-white/[0.06] md:hidden"
         aria-label="Open menu"
       >
         <Menu className="h-5 w-5" style={{ color: '#8B9AB0' }} />
       </button>
 
       {/* Search */}
-      <div ref={containerRef} className="relative mx-2 flex max-w-md flex-1 md:max-w-lg">
+      <CommandPalette />
+
+      <div ref={containerRef} className="relative mx-1 hidden min-w-0 flex-1 sm:mx-2 sm:flex md:max-w-lg">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: '#4A5568' }} />
           <Input
-            placeholder="Search lessons, notes..."
+            placeholder="Search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => query.length >= 2 && setOpen(true)}
-            className="min-h-[44px] pl-10 text-sm"
+            className="min-h-[44px] min-w-0 pl-10 text-sm"
             style={{
               background: 'rgba(20,27,36,0.8)',
               border: '1px solid rgba(255,255,255,0.06)',
@@ -175,7 +181,7 @@ export function TopNav({ sidebarOpen = true, onMenuClick }: TopNavProps) {
       </div>
 
       {/* Right actions */}
-      <div className="ml-auto flex items-center gap-2 md:gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2 md:gap-3">
         {/* Credits badge */}
         <Link href="/settings" className="flex items-center">
           <motion.span whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>

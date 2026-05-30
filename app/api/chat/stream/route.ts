@@ -1,5 +1,5 @@
 import { parseProviderFromRequest, streamCompletion } from '@/lib/ai-provider';
-import { retrieveContext } from '@/lib/rag';
+import { retrieveContextWithSources } from '@/lib/rag';
 import { getUserId } from '@/lib/session';
 import { checkAndDeductCredit } from '@/lib/credits';
 
@@ -14,10 +14,24 @@ const MASTER_PROVIDER = {
   embeddingModel: 'text-embedding-3-small',
 };
 
+function tutorSystemPrompt(context: string, tutorModeInstruction?: string) {
+  const modeInstruction = tutorModeInstruction
+    ? `\nTUTOR MODE: ${tutorModeInstruction}\n`
+    : '\n';
+
+  return `You are a helpful AI tutor. Use the provided context to answer the student's question.${modeInstruction}
+Be clear, direct, and educational. When you use the provided context, cite it inline with source numbers like [1] or [2].
+If the context is not enough, say what is missing instead of pretending. End with a follow-up question.
+CONTEXT: ${context}`;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { query } = body as { query?: string };
+    const { query, tutorModeInstruction } = body as {
+      query?: string;
+      tutorModeInstruction?: string;
+    };
 
     if (!query || typeof query !== 'string') {
       return new Response(JSON.stringify({ error: 'Query is required' }), {
@@ -55,10 +69,8 @@ export async function POST(request: Request) {
         );
       }
 
-      const context = await retrieveContext(query, provider);
-      const systemPrompt = `You are a helpful AI tutor. Use the provided context to answer the student's question.
-Be clear, direct, and educational. End with a follow-up question.
-CONTEXT: ${context}`;
+      const { context, sources } = await retrieveContextWithSources(query, provider);
+      const systemPrompt = tutorSystemPrompt(context, tutorModeInstruction);
 
       return new Response(
         new ReadableStream({
@@ -66,7 +78,7 @@ CONTEXT: ${context}`;
             const encoder = new TextEncoder();
             try {
               controller.enqueue(
-                encoder.encode(`\x00${JSON.stringify({ credits: remaining })}\x00`)
+                encoder.encode(`\x00${JSON.stringify({ credits: remaining, sources })}\x00`)
               );
               for await (const chunk of streamCompletion(query, provider, systemPrompt)) {
                 controller.enqueue(encoder.encode(chunk));
@@ -84,16 +96,17 @@ CONTEXT: ${context}`;
     }
 
     // BYO key path — no credit check
-    const context = await retrieveContext(query, provider);
-    const systemPrompt = `You are a helpful AI tutor. Use the provided context to answer the student's question.
-Be clear, direct, and educational. End with a follow-up question.
-CONTEXT: ${context}`;
+    const { context, sources } = await retrieveContextWithSources(query, provider);
+    const systemPrompt = tutorSystemPrompt(context, tutorModeInstruction);
 
     return new Response(
       new ReadableStream({
         async start(controller) {
           const encoder = new TextEncoder();
           try {
+            controller.enqueue(
+              encoder.encode(`\x00${JSON.stringify({ sources })}\x00`)
+            );
             for await (const chunk of streamCompletion(query, provider, systemPrompt)) {
               controller.enqueue(encoder.encode(chunk));
             }

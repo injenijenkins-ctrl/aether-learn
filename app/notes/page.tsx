@@ -6,6 +6,9 @@ import { toast } from 'sonner';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SourceCitations } from '@/components/source-citations';
+import { AudioLearningControls } from '@/components/audio-learning-controls';
+import { OfflineSaveButton } from '@/components/offline-save-button';
 import { Loader2, Plus, Sparkles, Trash2, Pencil } from 'lucide-react';
 import { useLearn, type Summary } from '@/hooks/use-lumina';
 import { logActivity } from '@/lib/activity-store';
@@ -138,6 +141,12 @@ export default function NotesPage() {
                 </Button>
               </div>
               <h3 className="mt-1 text-sm font-semibold" style={{ color: '#F0F4F8' }}>{note.query}</h3>
+              <div className="mt-4">
+                <AudioLearningControls
+                  title={note.query}
+                  text={`${note.summary?.oneLiner || ''}. ${note.summary?.keyPoints?.join('. ') || ''}. Takeaway: ${note.summary?.coreTakeaway || ''}`}
+                />
+              </div>
               <p className="mt-2 text-sm" style={{ color: '#7C6AF5' }}>{note.summary?.oneLiner}</p>
               <ul className="mt-3 space-y-1">
                 {note.summary?.keyPoints?.slice(0, 5).map((p, j) => (
@@ -153,6 +162,17 @@ export default function NotesPage() {
               >
                 <span className="font-semibold" style={{ color: '#F0F4F8' }}>Takeaway: </span>
                 <span style={{ color: '#8B9AB0' }}>{note.summary?.coreTakeaway}</span>
+              </div>
+              <div className="mt-4">
+                <SourceCitations sources={note.summary?.sources} title="Note sources" />
+              </div>
+              <div className="mt-4">
+                <OfflineSaveButton
+                  id={`note:${note.id}`}
+                  type="note"
+                  title={note.query}
+                  content={`${note.summary?.oneLiner || ''}\n\n${note.summary?.keyPoints?.join('\n') || ''}\n\nTakeaway: ${note.summary?.coreTakeaway || ''}`}
+                />
               </div>
             </motion.div>
           ))}

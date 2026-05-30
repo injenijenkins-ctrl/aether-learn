@@ -19,12 +19,14 @@ export interface Lesson {
   keyPoints: string[];
   commonMistakes: string[];
   depth: string;
+  sources?: ChatSourceCitation[];
 }
 
 export interface Summary {
   oneLiner: string;
   keyPoints: string[];
   coreTakeaway: string;
+  sources?: ChatSourceCitation[];
 }
 
 export interface QuizQuestion {
@@ -37,12 +39,33 @@ export interface QuizQuestion {
 
 export interface Quiz {
   questions: QuizQuestion[];
+  sources?: ChatSourceCitation[];
 }
 
 export interface FlashcardItem {
   id: string;
   front: string;
   back: string;
+}
+
+export interface FlashcardSet {
+  cards: FlashcardItem[];
+  sources?: ChatSourceCitation[];
+}
+
+export interface ChatSourceCitation {
+  id: string;
+  number: number;
+  chunkId: string;
+  resourceId: string;
+  title: string;
+  type: string;
+  snippet: string;
+}
+
+export interface ChatStreamMetadata {
+  credits?: number;
+  sources?: ChatSourceCitation[];
 }
 
 function withProvider<T extends Record<string, unknown>>(data: T) {
@@ -275,7 +298,10 @@ export function useLearn() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to generate flashcards');
-      return (data.cards || []) as FlashcardItem[];
+      return {
+        cards: (data.cards || []) as FlashcardItem[],
+        sources: data.sources || [],
+      } as FlashcardSet;
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Flashcards failed';
       setError(msg);
@@ -340,7 +366,9 @@ export function useChat() {
     async (
       query: string,
       onChunk: (chunk: string) => void,
-      messages?: { role: 'user' | 'assistant'; content: string }[]
+      messages?: { role: 'user' | 'assistant'; content: string }[],
+      onMetadata?: (metadata: ChatStreamMetadata) => void,
+      options?: { tutorModeInstruction?: string }
     ) => {
       setLoading(true);
       setError(null);
@@ -348,7 +376,7 @@ export function useChat() {
         const response = await fetch('/api/chat/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...providerHeaders() },
-          body: JSON.stringify(withProvider({ query, messages })),
+          body: JSON.stringify(withProvider({ query, messages, ...options })),
         });
 
         if (!response.ok) {
@@ -360,10 +388,40 @@ export function useChat() {
         if (!reader) throw new Error('No response body');
 
         const decoder = new TextDecoder();
+        let inMetadataFrame = false;
+        let metadataBuffer = '';
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          onChunk(decoder.decode(value, { stream: true }));
+          const decoded = decoder.decode(value, { stream: true });
+          let visibleText = '';
+
+          for (const char of decoded) {
+            if (char === '\x00') {
+              if (inMetadataFrame && metadataBuffer) {
+                try {
+                  onMetadata?.(JSON.parse(metadataBuffer) as ChatStreamMetadata);
+                } catch {
+                  // Ignore malformed metadata frames and keep streaming text.
+                }
+                metadataBuffer = '';
+              }
+              inMetadataFrame = !inMetadataFrame;
+              continue;
+            }
+            if (inMetadataFrame) {
+              metadataBuffer += char;
+              continue;
+            }
+            if (!inMetadataFrame) visibleText += char;
+          }
+
+          const streamError = visibleText.match(/(?:^|\n\n)Error:\s*(.+)$/);
+          if (streamError) {
+            throw new Error(streamError[1] || 'Chat stream failed');
+          }
+
+          if (visibleText) onChunk(visibleText);
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Chat failed';

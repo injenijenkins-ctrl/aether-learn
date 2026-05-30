@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getSupabase } from '@/lib/supabase';
 import { getUserId } from '@/lib/session';
 import { nextSM2State, type ReviewQuality } from '@/lib/sm2';
+import { estimateMemory } from '@/lib/memory-model';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,18 +38,32 @@ export async function GET() {
       throw new Error(allError.message);
     }
 
-    const mapRow = (r: Record<string, unknown>) => ({
-      id: r.id,
-      cardId: r.card_id,
-      easeFactor: r.ease_factor,
-      interval: r.interval,
-      repetitions: r.repetitions,
-      nextReview: r.next_review,
-      lastReview: r.last_review,
-      front: r.front,
-      back: r.back,
-      topic: r.topic,
-    });
+    const mapRow = (r: Record<string, unknown>) => {
+      const memory = estimateMemory({
+        easeFactor: Number(r.ease_factor),
+        interval: Number(r.interval),
+        repetitions: Number(r.repetitions),
+        lastReview: r.last_review as string | null,
+        nextReview: r.next_review as string | null,
+      });
+
+      return {
+        id: r.id,
+        cardId: r.card_id,
+        easeFactor: r.ease_factor,
+        interval: r.interval,
+        repetitions: r.repetitions,
+        nextReview: r.next_review,
+        lastReview: r.last_review,
+        front: r.front,
+        back: r.back,
+        topic: r.topic,
+        memoryStrength: Math.round(memory.strength * 100),
+        predictedForgetAt: memory.predictedForgetAt,
+        optimalReviewAt: memory.optimalReviewAt,
+        overdue: memory.overdue,
+      };
+    };
 
     return NextResponse.json({
       due: (due || []).map(mapRow),

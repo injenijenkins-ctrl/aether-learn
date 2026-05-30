@@ -1,12 +1,15 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { SourceCitations, type SourceCitation } from '@/components/source-citations';
 import { ChevronLeft, ChevronRight, Loader2, RotateCw, Sparkles, Layers } from 'lucide-react';
 import { useLearn, type FlashcardItem } from '@/hooks/use-lumina';
 import { logActivity } from '@/lib/activity-store';
@@ -26,15 +29,31 @@ const cardStyle = {
   backdropFilter: 'blur(16px)',
 };
 
+const creditLimitMessage =
+  "You've used all your free requests for today. Your credits reset in a few hours. Add your API key in Settings for unlimited access.";
+
+function isCreditLimitError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    message.includes('429') ||
+    normalized.includes('free requests') ||
+    normalized.includes('credits') ||
+    normalized.includes('api key')
+  );
+}
+
 export default function FlashcardsPage() {
   const { generateFlashcards, loading } = useLearn();
   const [topic, setTopic] = useState('');
   const [cards, setCards] = useState<FlashcardItem[]>([]);
+  const [sources, setSources] = useState<SourceCitation[]>([]);
   const [reviewMap, setReviewMap] = useState<Record<string, string>>({});
   const [dueCards, setDueCards] = useState<ReviewRow[]>([]);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [mode, setMode] = useState<'browse' | 'due'>('browse');
+  const [generationError, setGenerationError] = useState<{ message: string; creditLimit: boolean } | null>(null);
 
   const loadReviews = useCallback(async () => {
     try {
@@ -51,13 +70,15 @@ export default function FlashcardsPage() {
 
   const handleGenerate = async () => {
     if (!topic.trim()) { toast.error('Enter a topic'); return; }
+    setGenerationError(null);
     try {
       const generated = await generateFlashcards(topic.trim());
-      setCards(generated);
+      setCards(generated.cards);
+      setSources(generated.sources || []);
       setIndex(0);
       setFlipped(false);
       setMode('browse');
-      for (const card of generated) {
+      for (const card of generated.cards) {
         await fetch('/api/flashcards/review', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -65,8 +86,15 @@ export default function FlashcardsPage() {
         });
       }
       await loadReviews();
-      toast.success(`Generated ${generated.length} flashcards`);
-    } catch { toast.error('Failed to generate flashcards'); }
+      toast.success(`Generated ${generated.cards.length} flashcards`);
+    } catch (error) {
+      const creditLimit = isCreditLimitError(error);
+      const message = creditLimit
+        ? creditLimitMessage
+        : "Couldn't generate your flashcards. Please try again.";
+      setGenerationError({ message, creditLimit });
+      toast.error(message);
+    }
   };
 
   const handleReview = async (quality: ReviewQuality) => {
@@ -181,8 +209,47 @@ export default function FlashcardsPage() {
         </div>
       </div>
 
+      {generationError && (
+        <div
+          className="mb-8 rounded-2xl p-5"
+          style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.18)' }}
+        >
+          <p className="text-sm" style={{ color: '#F0F4F8' }}>{generationError.message}</p>
+          {generationError.creditLimit && (
+            <Link href="/settings" className="mt-4 inline-block">
+              <Button
+                className="min-h-[40px] text-white"
+                style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)', border: 'none' }}
+              >
+                Add API Key
+              </Button>
+            </Link>
+          )}
+        </div>
+      )}
+
+      {loading && (
+        <div className="mx-auto max-w-lg">
+          <div className="mb-4 flex animate-pulse items-center justify-center gap-2 text-sm font-medium" style={{ color: '#7C6AF5' }}>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Generating flashcards...
+          </div>
+          <div
+            className="rounded-2xl p-8"
+            style={{
+              background: 'linear-gradient(135deg, rgba(124,106,245,0.1) 0%, rgba(91,141,245,0.08) 100%)',
+              border: '1px solid rgba(124,106,245,0.2)',
+            }}
+          >
+            <Skeleton className="mx-auto h-5 w-2/3 bg-white/[0.08]" />
+            <Skeleton className="mx-auto mt-5 h-4 w-5/6 bg-white/[0.08]" />
+            <Skeleton className="mx-auto mt-3 h-4 w-1/2 bg-white/[0.08]" />
+          </div>
+        </div>
+      )}
+
       {/* Card viewer */}
-      {current && (
+      {!loading && current && (
         <div className="mx-auto max-w-lg">
           <p className="mb-4 text-center text-xs" style={{ color: '#4A5568' }}>
             Card {index + 1} of {displayCards.length}
@@ -257,11 +324,15 @@ export default function FlashcardsPage() {
               Next <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
+
+          <div className="mt-5">
+            <SourceCitations sources={sources} title="Flashcard sources" />
+          </div>
         </div>
       )}
 
       {/* Empty state */}
-      {displayCards.length === 0 && (
+      {!loading && displayCards.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}

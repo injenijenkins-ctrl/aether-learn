@@ -52,7 +52,6 @@ export default function IngestionPage() {
     listResources,
     deleteResource,
     loading,
-    error,
   } = useIngest();
   const [activeTab, setActiveTab] = useState<TabId>('url');
   const [url, setUrl] = useState('');
@@ -81,10 +80,6 @@ export default function IngestionPage() {
     refresh();
   }, [refresh]);
 
-  useEffect(() => {
-    if (error) toast.error(error);
-  }, [error]);
-
   const handleUrlIngest = async () => {
     if (!url.trim()) {
       toast.error('Enter a URL');
@@ -97,7 +92,7 @@ export default function IngestionPage() {
       setUrl('');
       await refresh();
     } catch {
-      // error handled in hook
+      toast.error("Couldn't process that content. Check the URL or try pasting the text directly.");
     }
   };
 
@@ -114,7 +109,7 @@ export default function IngestionPage() {
       setTitle('');
       await refresh();
     } catch {
-      // error handled in hook
+      toast.error("Couldn't process that content. Check the URL or try pasting the text directly.");
     }
   };
 
@@ -144,6 +139,7 @@ export default function IngestionPage() {
       await refresh();
     } catch {
       setUploadProgress(0);
+      toast.error("Couldn't process that content. Check the URL or try pasting the text directly.");
     }
   };
 
@@ -159,7 +155,7 @@ export default function IngestionPage() {
       setTranscribedText(result.text);
       toast.success('Transcription complete — review and confirm below');
     } catch {
-      toast.error('Transcription failed');
+      toast.error("Couldn't process that content. Check the URL or try pasting the text directly.");
     } finally {
       setTranscribing(false);
     }
@@ -182,7 +178,7 @@ export default function IngestionPage() {
       if (audioInputRef.current) audioInputRef.current.value = '';
       await refresh();
     } catch {
-      // hook handles error
+      toast.error("Couldn't process that content. Check the URL or try pasting the text directly.");
     }
   };
 
@@ -192,7 +188,7 @@ export default function IngestionPage() {
       toast.success('Resource deleted');
       await refresh();
     } catch {
-      // error in hook
+      toast.error("Couldn't delete that resource. Please try again.");
     }
   };
 
@@ -208,11 +204,11 @@ export default function IngestionPage() {
       title="Content Ingestion"
       description="Add any content — a website, document, or your own notes — and AetherLearn will turn it into a personal knowledge base you can learn from."
     >
-      <div className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[1.05fr_0.95fr] xl:gap-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="rounded-2xl p-6"
+          className="min-w-0 rounded-2xl p-4 sm:p-6"
           style={cardStyle}
         >
           <div className="mb-7">
@@ -229,7 +225,7 @@ export default function IngestionPage() {
           </div>
 
           <div
-            className="mb-6 grid grid-cols-2 gap-2 rounded-2xl p-1 sm:grid-cols-4"
+            className="mb-6 flex min-w-0 gap-2 overflow-x-auto rounded-2xl p-1 sm:grid sm:grid-cols-4 sm:overflow-visible"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
           >
             {tabs.map((tab) => (
@@ -237,7 +233,7 @@ export default function IngestionPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors"
+                className="flex min-h-[44px] min-w-max shrink-0 items-center justify-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors sm:min-w-0"
                 style={
                   activeTab === tab.id
                     ? { background: 'rgba(124,106,245,0.16)', color: '#F0F4F8', border: '1px solid rgba(124,106,245,0.24)' }
@@ -252,6 +248,26 @@ export default function IngestionPage() {
               </button>
             ))}
           </div>
+
+          {loading && (
+            <div
+              className="mb-6 rounded-2xl p-4"
+              style={{ background: 'rgba(124,106,245,0.08)', border: '1px solid rgba(124,106,245,0.18)' }}
+            >
+              <div className="flex items-center gap-3 text-sm font-medium" style={{ color: '#F0F4F8' }}>
+                <span>Processing your content...</span>
+                <span className="flex items-center gap-1">
+                  {[0, 1, 2].map((dot) => (
+                    <span
+                      key={dot}
+                      className="h-1.5 w-1.5 animate-bounce rounded-full"
+                      style={{ background: '#7C6AF5', animationDelay: `${dot * 150}ms` }}
+                    />
+                  ))}
+                </span>
+              </div>
+            </div>
+          )}
 
           {activeTab === 'url' && (
             <div className="space-y-4">
@@ -424,7 +440,7 @@ export default function IngestionPage() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 }}
-          className="rounded-2xl p-6"
+          className="min-w-0 rounded-2xl p-4 sm:p-6"
           style={cardStyle}
         >
           <div className="mb-5 flex items-start gap-4">
@@ -458,9 +474,9 @@ export default function IngestionPage() {
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
                   whileHover={{ borderColor: 'rgba(124,106,245,0.22)', background: 'rgba(20,27,36,0.72)' }}
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium break-words" style={{ color: '#F0F4F8' }}>{r.title}</p>
-                    <p className="text-xs" style={{ color: '#8B9AB0' }}>
+                    <p className="break-words text-xs" style={{ color: '#8B9AB0' }}>
                       {r.type} · {r.chunkCount} chunks ·{' '}
                       {new Date(r.createdAt).toLocaleString()}
                     </p>

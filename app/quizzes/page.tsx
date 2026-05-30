@@ -1,12 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { SourceCitations } from '@/components/source-citations';
 import { Loader2, RotateCcw, Sparkles, HelpCircle } from 'lucide-react';
 import { useLearn, type Quiz, type QuizQuestion } from '@/hooks/use-lumina';
 import { logActivity } from '@/lib/activity-store';
@@ -23,23 +26,46 @@ const cardStyle = {
   backdropFilter: 'blur(16px)',
 };
 
+const creditLimitMessage =
+  "You've used all your free requests for today. Your credits reset in a few hours. Add your API key in Settings for unlimited access.";
+
+function isCreditLimitError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    message.includes('429') ||
+    normalized.includes('free requests') ||
+    normalized.includes('credits') ||
+    normalized.includes('api key')
+  );
+}
+
 export default function QuizzesPage() {
-  const { generateQuiz, saveQuizResult, loading, error } = useLearn();
+  const { generateQuiz, saveQuizResult, loading } = useLearn();
   const [topic, setTopic] = useState('');
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
+  const [generationError, setGenerationError] = useState<{ message: string; creditLimit: boolean } | null>(null);
 
   const handleGenerate = async () => {
     if (!topic.trim()) { toast.error('Enter a quiz topic'); return; }
     setSubmitted(false);
     setAnswers({});
+    setGenerationError(null);
     try {
       const result = await generateQuiz(topic.trim());
       setQuiz(result);
       toast.success('Quiz ready');
-    } catch { toast.error(error || 'Failed to generate quiz'); }
+    } catch (error) {
+      const creditLimit = isCreditLimitError(error);
+      const message = creditLimit
+        ? creditLimitMessage
+        : "Couldn't generate your quiz. Please try again.";
+      setGenerationError({ message, creditLimit });
+      toast.error(message);
+    }
   };
 
   const handleSubmit = () => {
@@ -88,7 +114,53 @@ export default function QuizzesPage() {
         </Button>
       </div>
 
-      {quiz?.questions && (
+      {generationError && (
+        <div
+          className="mb-8 rounded-2xl p-5"
+          style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.18)' }}
+        >
+          <p className="text-sm" style={{ color: '#F0F4F8' }}>{generationError.message}</p>
+          {generationError.creditLimit && (
+            <Link href="/settings" className="mt-4 inline-block">
+              <Button
+                className="min-h-[40px] text-white"
+                style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)', border: 'none' }}
+              >
+                Add API Key
+              </Button>
+            </Link>
+          )}
+        </div>
+      )}
+
+      {loading && (
+        <div className="space-y-5">
+          <div className="flex animate-pulse items-center gap-2 text-sm font-medium" style={{ color: '#7C6AF5' }}>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Generating your quiz...
+          </div>
+          {Array.from({ length: 5 }).map((_, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.04 }}
+              className="space-y-4 rounded-2xl p-6"
+              style={cardStyle}
+            >
+              <Skeleton className="h-5 w-3/4 bg-white/[0.08]" />
+              <div className="space-y-2">
+                <Skeleton className="h-11 w-full rounded-xl bg-white/[0.08]" />
+                <Skeleton className="h-11 w-full rounded-xl bg-white/[0.08]" />
+                <Skeleton className="h-11 w-full rounded-xl bg-white/[0.08]" />
+                <Skeleton className="h-11 w-full rounded-xl bg-white/[0.08]" />
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {!loading && quiz?.questions && (
         <div className="space-y-5">
           {/* Score banner */}
           {submitted && (
@@ -180,11 +252,13 @@ export default function QuizzesPage() {
               Submit Quiz
             </Button>
           )}
+
+          <SourceCitations sources={quiz.sources} title="Quiz sources" />
         </div>
       )}
 
       {/* Empty state */}
-      {!quiz && (
+      {!loading && !quiz && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}

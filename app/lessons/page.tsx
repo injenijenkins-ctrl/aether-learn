@@ -1,12 +1,17 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { SourceCitations } from '@/components/source-citations';
+import { AudioLearningControls } from '@/components/audio-learning-controls';
+import { OfflineSaveButton } from '@/components/offline-save-button';
 import {
   Select,
   SelectContent,
@@ -26,12 +31,27 @@ const cardStyle = {
   backdropFilter: 'blur(16px)',
 };
 
+const creditLimitMessage =
+  "You've used all your free requests for today. Your credits reset in a few hours. Add your API key in Settings for unlimited access.";
+
+function isCreditLimitError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    message.includes('429') ||
+    normalized.includes('free requests') ||
+    normalized.includes('credits') ||
+    normalized.includes('api key')
+  );
+}
+
 export default function LessonsPage() {
-  const { generateLesson, loading, error } = useLearn();
+  const { generateLesson, loading } = useLearn();
   const [query, setQuery] = useState('');
   const [depth, setDepth] = useState<LessonDepth>('beginner');
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [userLevel, setUserLevel] = useState<UserLevel>('beginner');
+  const [generationError, setGenerationError] = useState<{ message: string; creditLimit: boolean } | null>(null);
 
   useEffect(() => {
     fetch('/api/progress')
@@ -48,14 +68,20 @@ export default function LessonsPage() {
 
   const runGenerate = async (lessonDepth: LessonDepth) => {
     if (!query.trim()) { toast.error('Enter a topic or question'); return; }
+    setGenerationError(null);
     try {
       const result = await generateLesson(query.trim(), lessonDepth, userLevel);
       setLesson(result);
       setDepth(lessonDepth);
       logActivity({ type: 'lesson', title: result.title });
       toast.success('Lesson generated');
-    } catch {
-      toast.error(error || 'Failed to generate lesson');
+    } catch (error) {
+      const creditLimit = isCreditLimitError(error);
+      const message = creditLimit
+        ? creditLimitMessage
+        : "Couldn't generate your lesson. Please try again.";
+      setGenerationError({ message, creditLimit });
+      toast.error(message);
     }
   };
 
@@ -115,8 +141,44 @@ export default function LessonsPage() {
         </Button>
       </div>
 
+      {generationError && (
+        <div
+          className="mb-8 rounded-2xl p-5"
+          style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.18)' }}
+        >
+          <p className="text-sm" style={{ color: '#F0F4F8' }}>{generationError.message}</p>
+          {generationError.creditLimit && (
+            <Link href="/settings" className="mt-4 inline-block">
+              <Button
+                className="min-h-[40px] text-white"
+                style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)', border: 'none' }}
+              >
+                Add API Key
+              </Button>
+            </Link>
+          )}
+        </div>
+      )}
+
+      {loading && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-5 rounded-2xl p-6 md:p-8"
+          style={cardStyle}
+        >
+          <div className="flex animate-pulse items-center gap-2 text-sm font-medium" style={{ color: '#7C6AF5' }}>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Generating your lesson...
+          </div>
+          <Skeleton className="h-5 w-2/3 bg-white/[0.08]" />
+          <Skeleton className="h-4 w-full bg-white/[0.08]" />
+          <Skeleton className="h-4 w-5/6 bg-white/[0.08]" />
+        </motion.div>
+      )}
+
       {/* Lesson output */}
-      {lesson && (
+      {!loading && lesson && (
         <motion.article
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -132,6 +194,11 @@ export default function LessonsPage() {
             </span>
             <h2 className="mt-3 text-xl font-bold" style={{ color: '#F0F4F8' }}>{lesson.title}</h2>
           </div>
+
+          <AudioLearningControls
+            title={lesson.title}
+            text={`${lesson.title}. ${lesson.explanation}. Key points: ${lesson.keyPoints?.join('. ') || ''}. Common mistakes: ${lesson.commonMistakes?.join('. ') || ''}`}
+          />
 
           <section>
             <h3 className="mb-2 text-sm font-semibold" style={{ color: '#7C6AF5' }}>Explanation</h3>
@@ -164,7 +231,15 @@ export default function LessonsPage() {
             </ul>
           </section>
 
+          <SourceCitations sources={lesson.sources} title="Lesson sources" />
+
           <div className="flex flex-col gap-2 sm:flex-row pt-2">
+            <OfflineSaveButton
+              id={`lesson:${lesson.title}`}
+              type="lesson"
+              title={lesson.title}
+              content={`${lesson.explanation}\n\nKey Points\n${lesson.keyPoints?.join('\n') || ''}\n\nCommon Mistakes\n${lesson.commonMistakes?.join('\n') || ''}`}
+            />
             <Button
               variant="outline"
               className="min-h-[44px]"
@@ -196,7 +271,7 @@ export default function LessonsPage() {
       )}
 
       {/* Empty state */}
-      {!lesson && (
+      {!loading && !lesson && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}

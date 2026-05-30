@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from 'sonner'
 import { Providers } from '@/components/providers'
@@ -11,6 +11,12 @@ export const metadata: Metadata = {
   title: 'AetherLearn - AI Learning Platform',
   description:
     'Learn anything with your personal AI tutor. Paste any content and get taught by AI.',
+  manifest: '/manifest.webmanifest',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default function RootLayout({

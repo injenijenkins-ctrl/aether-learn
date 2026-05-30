@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateCompletion, parseProviderFromRequest } from '@/lib/ai-provider';
-import { retrieveContext } from '@/lib/rag';
+import { retrieveContextWithSources } from '@/lib/rag';
 import { getUserId } from '@/lib/session';
 import { checkAndDeductCredit } from '@/lib/credits';
 
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 });
     }
 
-    const context = await retrieveContext(query, provider);
+    const { context, sources } = await retrieveContextWithSources(query, provider);
     const systemPrompt = `Return ONLY valid JSON, no markdown fences:
 {
   "oneLiner": "one sentence summary",
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     try {
       const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
       const summary = JSON.parse(cleaned);
-      return NextResponse.json(summary);
+      return NextResponse.json({ ...summary, sources });
     } catch {
       return NextResponse.json(
         { error: 'Failed to parse summary' },

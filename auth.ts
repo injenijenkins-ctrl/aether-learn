@@ -3,7 +3,11 @@ import { authConfig } from '@/auth.config';
 import { upsertUser } from '@/lib/db';
 
 function getAuthSecret(): string | undefined {
-  return process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  return (
+    process.env.AUTH_SECRET ??
+    process.env.NEXTAUTH_SECRET ??
+    (process.env.NODE_ENV === 'production' ? undefined : 'aetherlearn-local-development-secret')
+  );
 }
 
 const secret = getAuthSecret();

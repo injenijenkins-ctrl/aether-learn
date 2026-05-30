@@ -1,3 +1,5 @@
+import { optimalReviewDateAfterReview } from '@/lib/memory-model';
+
 export type ReviewQuality = 'hard' | 'good' | 'easy';
 
 export interface SM2State {
@@ -35,8 +37,10 @@ export function nextSM2State(
     easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
   );
 
-  const nextReview = new Date();
-  nextReview.setDate(nextReview.getDate() + interval);
+  const nextReview = optimalReviewDateAfterReview(
+    { easeFactor, interval, repetitions },
+    quality
+  );
 
   return { easeFactor, interval, repetitions, nextReview };
 }

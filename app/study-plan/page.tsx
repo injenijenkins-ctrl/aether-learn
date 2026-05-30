@@ -1,12 +1,15 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { SourceCitations, type SourceCitation } from '@/components/source-citations';
 import {
   Select,
   SelectContent,
@@ -31,6 +34,7 @@ interface StudyPlan {
   targetTopics: string;
   studyGoal: string;
   days: PlanDay[];
+  sources?: SourceCitation[];
   createdAt: string;
 }
 
@@ -46,12 +50,16 @@ const inputStyle = {
   color: '#F0F4F8',
 };
 
+const creditLimitMessage =
+  "You've used all your free requests for today. Your credits reset in a few hours. Add your API key in Settings for unlimited access.";
+
 export default function StudyPlanPage() {
   const [plan, setPlan] = useState<StudyPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [dailyMinutes, setDailyMinutes] = useState('30');
   const [targetTopics, setTargetTopics] = useState('');
   const [studyGoal, setStudyGoal] = useState('exam prep');
+  const [generationError, setGenerationError] = useState<{ message: string; creditLimit: boolean } | null>(null);
 
   useEffect(() => {
     fetch('/api/study-plan')
@@ -62,6 +70,7 @@ export default function StudyPlanPage() {
 
   const handleGenerate = async () => {
     if (!targetTopics.trim()) { toast.error('Enter target topics'); return; }
+    setGenerationError(null);
     setLoading(true);
     try {
       const res = await fetch('/api/study-plan', {
@@ -75,11 +84,34 @@ export default function StudyPlanPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to generate plan');
-      setPlan({ id: data.id, dailyMinutes: data.dailyMinutes, targetTopics: data.targetTopics, studyGoal: data.studyGoal, days: data.days, createdAt: data.createdAt });
+      if (!res.ok) {
+        const creditLimit = res.status === 429;
+        const message = creditLimit
+          ? creditLimitMessage
+          : "Couldn't generate your study plan. Please try again.";
+        setGenerationError({ message, creditLimit });
+        throw new Error(message);
+      }
+      setPlan({
+        id: data.id,
+        dailyMinutes: data.dailyMinutes,
+        targetTopics: data.targetTopics,
+        studyGoal: data.studyGoal,
+        days: data.days,
+        sources: data.sources || [],
+        createdAt: data.createdAt,
+      });
       toast.success('Study plan generated');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Generation failed');
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message === creditLimitMessage
+          ? creditLimitMessage
+          : "Couldn't generate your study plan. Please try again.";
+      setGenerationError({
+        message,
+        creditLimit: message === creditLimitMessage,
+      });
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -188,7 +220,43 @@ export default function StudyPlanPage() {
               </div>
             )}
           </div>
-          {!plan ? (
+          {generationError && (
+            <div
+              className="mb-5 rounded-2xl p-4"
+              style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.18)' }}
+            >
+              <p className="text-sm" style={{ color: '#F0F4F8' }}>{generationError.message}</p>
+              {generationError.creditLimit && (
+                <Link href="/settings" className="mt-4 inline-block">
+                  <Button
+                    className="min-h-[40px] text-white"
+                    style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)', border: 'none' }}
+                  >
+                    Add API Key
+                  </Button>
+                </Link>
+              )}
+            </div>
+          )}
+          {loading ? (
+            <div className="space-y-4">
+              <div className="flex animate-pulse items-center gap-2 text-sm font-medium" style={{ color: '#7C6AF5' }}>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Building your study plan...
+              </div>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="space-y-3 rounded-xl p-4"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+                >
+                  <Skeleton className="h-4 w-1/3 bg-white/[0.08]" />
+                  <Skeleton className="h-3 w-2/3 bg-white/[0.08]" />
+                  <Skeleton className="h-3 w-full bg-white/[0.08]" />
+                </div>
+              ))}
+            </div>
+          ) : !plan ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <div
                 className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
@@ -251,6 +319,7 @@ export default function StudyPlanPage() {
                   </ul>
                 </motion.div>
               ))}
+              <SourceCitations sources={plan.sources} title="Study plan sources" />
             </div>
           )}
         </motion.div>

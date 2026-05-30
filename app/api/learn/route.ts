@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { generateCompletion, parseProviderFromRequest } from '@/lib/ai-provider';
 import { getSupabase } from '@/lib/supabase';
-import { retrieveContext } from '@/lib/rag';
+import { retrieveContextWithSources } from '@/lib/rag';
 import { getUserId } from '@/lib/session';
 import { checkAndDeductCredit } from '@/lib/credits';
 
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
         ? userLevel
         : 'beginner';
 
-    const context = await retrieveContext(query, provider);
+    const { context, sources } = await retrieveContextWithSources(query, provider);
     const systemPrompt = `You are an expert tutor. Given this content, generate a structured lesson.
 Return ONLY valid JSON, no markdown fences:
 {
@@ -103,7 +103,7 @@ Depth level: ${depthLevel}. Student proficiency: ${level}. Adjust vocabulary and
 
       if (error) console.error('lesson_history insert failed:', error);
 
-      return NextResponse.json(lesson);
+      return NextResponse.json({ ...lesson, sources });
     } catch {
       return NextResponse.json(
         { error: 'Failed to parse lesson' },

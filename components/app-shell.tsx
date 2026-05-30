@@ -3,6 +3,9 @@
 import React, { useState } from 'react';
 import { Sidebar } from '@/components/sidebar';
 import { TopNav } from '@/components/top-nav';
+import { MobileBottomNav } from '@/components/mobile-bottom-nav';
+import { StudyCompanionWidget } from '@/components/study-companion-widget';
+import { OfflineRuntime } from '@/components/offline-runtime';
 import { cn } from '@/lib/utils';
 
 interface AppShellProps {
@@ -16,7 +19,7 @@ export function AppShell({ children, title, description }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen" style={{ background: '#080B11' }}>
+    <div className="flex min-h-screen overflow-x-hidden" style={{ background: '#080B11' }}>
       <Sidebar
         open={sidebarOpen}
         mobileOpen={mobileOpen}
@@ -24,37 +27,26 @@ export function AppShell({ children, title, description }: AppShellProps) {
         onMobileClose={() => setMobileOpen(false)}
       />
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-30 md:hidden"
-          style={{ background: 'rgba(8,11,17,0.7)', backdropFilter: 'blur(4px)' }}
-          aria-label="Close menu"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
       <div
         className={cn(
-          'flex flex-1 flex-col transition-all duration-300',
+          'flex min-w-0 flex-1 flex-col transition-all duration-300',
           sidebarOpen ? 'md:ml-64' : 'md:ml-20',
           'ml-0'
         )}
       >
         <TopNav sidebarOpen={sidebarOpen} onMenuClick={() => setMobileOpen(true)} />
 
-        <main className="flex-1 overflow-y-auto pt-16">
-          <div className="px-4 py-8 md:px-8 md:py-10">
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto pb-24 pt-16 md:pb-0">
+          <div className="w-full max-w-full px-4 py-6 sm:px-5 md:px-8 md:py-10">
             {(title || description) && (
-              <div className="mb-8">
+              <div className="mb-6 min-w-0 md:mb-8">
                 {title && (
-                  <h1 className="text-2xl font-bold md:text-3xl" style={{ color: '#F0F4F8' }}>
+                  <h1 className="break-words text-2xl font-bold md:text-3xl" style={{ color: '#F0F4F8' }}>
                     {title}
                   </h1>
                 )}
                 {description && (
-                  <p className="mt-1.5 text-sm" style={{ color: '#8B9AB0' }}>
+                  <p className="mt-1.5 max-w-3xl text-sm" style={{ color: '#8B9AB0' }}>
                     {description}
                   </p>
                 )}
@@ -63,6 +55,9 @@ export function AppShell({ children, title, description }: AppShellProps) {
             {children}
           </div>
         </main>
+        <StudyCompanionWidget />
+        <MobileBottomNav />
+        <OfflineRuntime />
       </div>
     </div>
   );

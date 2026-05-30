@@ -28,6 +28,23 @@ interface ProgressIntel {
   };
 }
 
+interface MemoryTopic {
+  topic: string;
+  cardCount: number;
+  currentStrength: number;
+  stabilityDays: number;
+  dueCards: number;
+  nextOptimalReviewAt: string;
+  predictedForgetAt: string | null;
+  curve: { date: string; day: number; strength: number; forgettingThreshold: number }[];
+}
+
+interface MemoryStrength {
+  targetRecall: number;
+  forgettingThreshold: number;
+  topics: MemoryTopic[];
+}
+
 const cardStyle = {
   background: 'rgba(13,17,23,0.8)',
   border: '1px solid rgba(255,255,255,0.06)',
@@ -45,14 +62,23 @@ const tooltipStyle = {
 export default function ProgressPage() {
   const [mounted, setMounted] = useState(false);
   const [intel, setIntel] = useState<ProgressIntel | null>(null);
+  const [memory, setMemory] = useState<MemoryStrength | null>(null);
 
   useEffect(() => {
     setMounted(true);
     refreshActivity();
-    fetch('/api/progress')
-      .then((r) => r.json())
-      .then(setIntel)
-      .catch(() => setIntel(null));
+    Promise.all([
+      fetch('/api/progress').then((r) => r.json()),
+      fetch('/api/memory-strength').then((r) => r.json()),
+    ])
+      .then(([progressData, memoryData]) => {
+        setIntel(progressData);
+        setMemory(memoryData);
+      })
+      .catch(() => {
+        setIntel(null);
+        setMemory(null);
+      });
   }, []);
 
   const activity = mounted ? getActivity() : [];
@@ -161,6 +187,104 @@ export default function ProgressPage() {
           </div>
         </div>
       </div>
+
+      {memory && (
+        <section className="mt-8">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-bold" style={{ color: '#F0F4F8' }}>Memory strength by topic</h2>
+              <p className="mt-1 max-w-2xl text-sm" style={{ color: '#8B9AB0' }}>
+                Predicted recall curves from your spaced repetition history. Reviews are scheduled around {memory.targetRecall}% recall before a topic drops toward {memory.forgettingThreshold}%.
+              </p>
+            </div>
+          </div>
+
+          {memory.topics.length === 0 ? (
+            <div className="rounded-2xl p-6 text-sm" style={cardStyle}>
+              <p style={{ color: '#8B9AB0' }}>
+                Generate and review flashcards to unlock memory strength graphs.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-5 lg:grid-cols-2">
+              {memory.topics.map((topic) => {
+                const strengthColor =
+                  topic.currentStrength >= 80
+                    ? '#34D399'
+                    : topic.currentStrength >= 60
+                    ? '#FBBF24'
+                    : '#F87171';
+                return (
+                  <div key={topic.topic} className="min-w-0 rounded-2xl p-5" style={cardStyle}>
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <h3 className="break-words text-sm font-semibold" style={{ color: '#F0F4F8' }}>
+                          {topic.topic}
+                        </h3>
+                        <p className="mt-1 text-xs" style={{ color: '#8B9AB0' }}>
+                          {topic.cardCount} cards · {topic.stabilityDays} day memory stability
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-left sm:text-right">
+                        <p className="text-2xl font-bold" style={{ color: strengthColor }}>
+                          {topic.currentStrength}%
+                        </p>
+                        <p className="text-xs" style={{ color: '#4A5568' }}>now</p>
+                      </div>
+                    </div>
+
+                    <div className="h-48 w-full min-w-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={topic.curve}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                          <XAxis dataKey="day" stroke="#4A5568" fontSize={11} tickLine={false} />
+                          <YAxis domain={[0, 100]} stroke="#4A5568" fontSize={11} tickLine={false} axisLine={false} />
+                          <Tooltip
+                            contentStyle={tooltipStyle}
+                            formatter={(value) => [`${value}%`, 'Predicted recall']}
+                            labelFormatter={(day) => `Day ${day}`}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="strength"
+                            stroke={strengthColor}
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                          <Line type="monotone" dataKey="forgettingThreshold" stroke="#4A5568" strokeDasharray="4 4" strokeWidth={1} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <p className="text-[11px] uppercase tracking-wide" style={{ color: '#4A5568' }}>Due</p>
+                        <p className="mt-1 text-sm font-semibold" style={{ color: topic.dueCards ? '#FBBF24' : '#34D399' }}>
+                          {topic.dueCards} cards
+                        </p>
+                      </div>
+                      <div className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <p className="text-[11px] uppercase tracking-wide" style={{ color: '#4A5568' }}>Review</p>
+                        <p className="mt-1 text-sm font-semibold" style={{ color: '#F0F4F8' }}>
+                          {new Date(topic.nextOptimalReviewAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </p>
+                      </div>
+                      <div className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <p className="text-[11px] uppercase tracking-wide" style={{ color: '#4A5568' }}>Forgets</p>
+                        <p className="mt-1 text-sm font-semibold" style={{ color: '#F87171' }}>
+                          {topic.predictedForgetAt
+                            ? new Date(topic.predictedForgetAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                            : 'Unknown'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Intel panels */}
       {intel && (

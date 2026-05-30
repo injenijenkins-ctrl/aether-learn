@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { CheckCircle2, Key, Loader2, Save, ShieldCheck, XCircle } from 'lucide-react';
+import { CheckCircle2, CreditCard, Key, Loader2, Save, ShieldCheck, Sparkles, XCircle } from 'lucide-react';
 import {
   isAIConfigured,
   loadAISettings,
@@ -52,6 +52,10 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [preset, setPreset] = useState<string>('custom');
   const [testing, setTesting] = useState(false);
+  const [billingLoading, setBillingLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
+  const [isPro, setIsPro] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,6 +67,34 @@ export default function SettingsPage() {
       (p) => p.baseUrl === loaded.baseUrl && p.model === loaded.model
     );
     if (match) setPreset(match.id);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('upgraded') === 'true') {
+      toast.success('Welcome to Pro! You now have unlimited access.');
+    }
+  }, []);
+
+  useEffect(() => {
+    async function loadBilling() {
+      setBillingLoading(true);
+      try {
+        const response = await fetch('/api/credits');
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to load billing');
+        setCredits(typeof data.credits === 'number' ? data.credits : null);
+        setIsPro(Boolean(data.is_pro));
+      } catch {
+        setCredits(null);
+        setIsPro(false);
+      } finally {
+        setBillingLoading(false);
+      }
+    }
+
+    loadBilling();
   }, []);
 
   const handlePreset = (id: string) => {
@@ -147,6 +179,21 @@ export default function SettingsPage() {
     }
   };
 
+  const handleUpgrade = async () => {
+    setCheckoutLoading(true);
+    try {
+      const response = await fetch('/api/stripe/checkout', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || 'Unable to start checkout');
+      }
+      window.location.href = data.url;
+    } catch {
+      toast.error("Couldn't start checkout. Please try again.");
+      setCheckoutLoading(false);
+    }
+  };
+
   const configured = isAIConfigured(settings);
 
   return (
@@ -159,6 +206,83 @@ export default function SettingsPage() {
         animate={{ opacity: 1, y: 0 }}
         className="max-w-3xl space-y-6"
       >
+        <div className="rounded-2xl p-6" style={cardStyle}>
+          <div className="mb-7 flex items-start gap-4">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+              style={{ background: 'rgba(124,106,245,0.12)' }}
+            >
+              <CreditCard className="h-6 w-6" style={{ color: '#7C6AF5' }} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-base font-semibold" style={{ color: '#F0F4F8' }}>Billing</h2>
+                {isPro && (
+                  <span
+                    className="inline-flex min-h-[28px] items-center gap-1.5 rounded-full px-3 text-xs font-semibold"
+                    style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399', border: '1px solid rgba(52,211,153,0.25)' }}
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Pro
+                  </span>
+                )}
+              </div>
+              {isPro ? (
+                <p className="mt-1 text-sm" style={{ color: '#8B9AB0' }}>
+                  You have unlimited access.
+                </p>
+              ) : (
+                <p className="mt-1 text-sm" style={{ color: '#8B9AB0' }}>
+                  Upgrade to Pro for unlimited AI requests, priority support, and group study rooms.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {billingLoading ? (
+            <div className="flex min-h-[44px] items-center gap-2 text-sm" style={{ color: '#8B9AB0' }}>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading billing...
+            </div>
+          ) : isPro ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-medium" style={{ color: '#34D399' }}>
+                You have unlimited access.
+              </p>
+              <Button
+                variant="outline"
+                className="min-h-[44px] w-full sm:w-auto"
+                style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', color: '#F0F4F8' }}
+                onClick={() => toast.info('Subscription management is coming soon.')}
+              >
+                Manage Subscription
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm" style={{ color: '#8B9AB0' }}>
+                Current credits remaining:{' '}
+                <span className="font-semibold" style={{ color: '#F0F4F8' }}>
+                  {credits ?? '—'}
+                </span>
+              </p>
+              <Button
+                onClick={handleUpgrade}
+                disabled={checkoutLoading}
+                className="min-h-[44px] w-full sm:w-auto"
+                style={gradientButtonStyle}
+              >
+                {checkoutLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                Upgrade to Pro — $8/month
+              </Button>
+            </div>
+          )}
+        </div>
+
         <div className="rounded-2xl p-6" style={cardStyle}>
           <div className="mb-7 flex items-start gap-4">
             <div

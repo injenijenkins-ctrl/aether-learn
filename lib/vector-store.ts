@@ -7,6 +7,12 @@ export interface Chunk {
   embedding: number[];
 }
 
+export interface SourceChunk extends Chunk {
+  resourceId: string;
+  resourceTitle: string;
+  resourceType: Resource['type'];
+}
+
 export interface Resource {
   id: string;
   title: string;
@@ -201,40 +207,91 @@ class VectorStore {
     topK = 5,
     userId?: string
   ): Promise<Chunk[]> {
+    const chunks = await this.searchWithSources(queryEmbedding, topK, userId);
+    return chunks.map(({ id, text, embedding }) => ({ id, text, embedding }));
+  }
+
+  async searchWithSources(
+    queryEmbedding: number[],
+    topK = 5,
+    userId?: string
+  ): Promise<SourceChunk[]> {
     try {
       const supabase = getSupabase();
-      let rows: { id: string; text: string; embedding: unknown }[] = [];
+      let rows: { id: string; resource_id: string; text: string; embedding: unknown }[] = [];
+      let resources: { id: string; title: string; type: string }[] = [];
 
       if (userId) {
-        const { data: resourceIds } = await supabase
+        const { data: userResources } = await supabase
           .from('resources')
-          .select('id')
+          .select('id, title, type')
           .eq('user_id', userId);
 
-        const ids = (resourceIds || []).map((r) => r.id);
+        resources = userResources || [];
+        const ids = resources.map((r) => r.id);
         if (ids.length === 0) return [];
 
         const { data, error } = await supabase
           .from('chunks')
-          .select('id, text, embedding')
+          .select('id, resource_id, text, embedding')
           .in('resource_id', ids);
 
         if (error || !data) return [];
         rows = data;
       } else {
-        const { data, error } = await supabase
-          .from('chunks')
-          .select('id, text, embedding');
+        const [{ data: allResources }, { data, error }] = await Promise.all([
+          supabase
+            .from('resources')
+            .select('id, title, type'),
+          supabase
+            .from('chunks')
+            .select('id, resource_id, text, embedding'),
+        ]);
+
+        resources = allResources || [];
 
         if (error || !data) return [];
         rows = data;
       }
 
-      const scored: { chunk: Chunk; score: number }[] = [];
+      const resourceMap = new Map(
+        resources.map((resource) => [
+          resource.id,
+          {
+            title: resource.title,
+            type: resource.type as Resource['type'],
+          },
+        ])
+      );
+
+      if (resources.length === 0 && rows.length > 0) {
+        const ids = Array.from(new Set(rows.map((row) => row.resource_id)));
+        const { data } = await supabase
+          .from('resources')
+          .select('id, title, type')
+          .in('id', ids);
+
+        for (const resource of data || []) {
+          resourceMap.set(resource.id, {
+            title: resource.title,
+            type: resource.type as Resource['type'],
+          });
+        }
+      }
+
+      const scored: { chunk: SourceChunk; score: number }[] = [];
 
       for (const row of rows) {
         const embedding = parseEmbedding(row.embedding);
-        const chunk: Chunk = { id: row.id, text: row.text, embedding };
+        const resource = resourceMap.get(row.resource_id);
+        const chunk: SourceChunk = {
+          id: row.id,
+          text: row.text,
+          embedding,
+          resourceId: row.resource_id,
+          resourceTitle: resource?.title || 'Untitled source',
+          resourceType: resource?.type || 'text',
+        };
         scored.push({
           chunk,
           score: cosineSimilarity(queryEmbedding, embedding),
@@ -245,6 +302,63 @@ class VectorStore {
         .sort((a, b) => b.score - a.score)
         .slice(0, topK)
         .map((s) => s.chunk);
+    } catch {
+      return [];
+    }
+  }
+
+  async searchResourceIdsWithSources(
+    queryEmbedding: number[],
+    resourceIds: string[],
+    topK = 5
+  ): Promise<SourceChunk[]> {
+    const ids = Array.from(new Set(resourceIds.filter(Boolean)));
+    if (ids.length === 0) return [];
+
+    try {
+      const supabase = getSupabase();
+      const [{ data: resources }, { data, error }] = await Promise.all([
+        supabase
+          .from('resources')
+          .select('id, title, type')
+          .in('id', ids),
+        supabase
+          .from('chunks')
+          .select('id, resource_id, text, embedding')
+          .in('resource_id', ids),
+      ]);
+
+      if (error || !data) return [];
+
+      const resourceMap = new Map(
+        (resources || []).map((resource) => [
+          resource.id,
+          {
+            title: resource.title,
+            type: resource.type as Resource['type'],
+          },
+        ])
+      );
+
+      return data
+        .map((row) => {
+          const embedding = parseEmbedding(row.embedding);
+          const resource = resourceMap.get(row.resource_id);
+          return {
+            chunk: {
+              id: row.id,
+              text: row.text,
+              embedding,
+              resourceId: row.resource_id,
+              resourceTitle: resource?.title || 'Approved course material',
+              resourceType: resource?.type || 'text',
+            } as SourceChunk,
+            score: cosineSimilarity(queryEmbedding, embedding),
+          };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, topK)
+        .map((entry) => entry.chunk);
     } catch {
       return [];
     }
@@ -284,4 +398,13 @@ export async function searchForUser(
 ): Promise<Chunk[]> {
   const userId = await getUserId();
   return vectorStore.search(queryEmbedding, topK, userId);
+}
+
+/** Source-aware scoped search for current user */
+export async function searchForUserWithSources(
+  queryEmbedding: number[],
+  topK = 5
+): Promise<SourceChunk[]> {
+  const userId = await getUserId();
+  return vectorStore.searchWithSources(queryEmbedding, topK, userId);
 }
