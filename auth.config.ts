@@ -31,7 +31,6 @@ export const authConfig = {
   pages: {
     signIn: '/login',
   },
-  // Auth.js v5 reads AUTH_SECRET from env; also set via auth.ts `secret` option
   secret: authSecret,
   callbacks: {
     authorized({ auth, request }) {
