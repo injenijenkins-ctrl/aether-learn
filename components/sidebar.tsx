@@ -3,17 +3,15 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signOut, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft,
   ChevronRight,
-  LogOut,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { navGroups } from '@/components/command-palette';
 
 interface SidebarProps {
@@ -193,18 +191,6 @@ export function Sidebar({ open = true, mobileOpen = false, onToggle, onMobileClo
                   {user?.email || ''}
                 </p>
               </div>
-            )}
-            {(open || mobileOpen) && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="min-h-[44px] min-w-[44px] shrink-0 hover:bg-white/[0.06]"
-                onClick={() => signOut({ callbackUrl: '/login' })}
-                aria-label="Sign out"
-              >
-                <LogOut className="h-4 w-4" style={{ color: '#8B9AB0' }} />
-              </Button>
             )}
           </div>
         </div>

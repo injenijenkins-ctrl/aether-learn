@@ -33,27 +33,7 @@ export const authConfig = {
   },
   secret: authSecret,
   callbacks: {
-    authorized({ auth, request }) {
-      const { pathname } = request.nextUrl;
-      const protectedPaths = [
-        '/dashboard',
-        '/course-books',
-        '/tutor',
-        '/lessons',
-        '/quizzes',
-        '/exams',
-        '/flashcards',
-        '/notes',
-        '/progress',
-        '/ingestion',
-        '/settings',
-        '/study-plan',
-        '/study-rooms',
-      ];
-      const isProtected = protectedPaths.some(
-        (p) => pathname === p || pathname.startsWith(`${p}/`)
-      );
-      if (isProtected) return !!auth;
+    authorized() {
       return true;
     },
     session({ session, token }) {

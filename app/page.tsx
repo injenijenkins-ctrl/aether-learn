@@ -2,8 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { Syne } from 'next/font/google';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
@@ -237,16 +235,8 @@ function HeroHeadline() {
 }
 
 export default function LandingPage() {
-  const router = useRouter();
-  const { status } = useSession();
   const prefersReducedMotion = useReducedMotion();
   const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    if (status === 'authenticated') {
-      router.replace('/dashboard');
-    }
-  }, [router, status]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
@@ -254,8 +244,6 @@ export default function LandingPage() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-
-  if (status === 'authenticated') return null;
 
   return (
     <main className={`${syne.variable} obsidian-page min-h-screen overflow-hidden text-white`}>
@@ -542,13 +530,13 @@ export default function LandingPage() {
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link
-              href="/login"
+              href="/dashboard"
               className="hidden h-10 items-center rounded-[10px] border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-[#F0F4F8] hover:border-white/25 sm:inline-flex sm:px-4"
             >
               Sign In
             </Link>
             <Link
-              href="/login"
+              href="/dashboard"
               className="inline-flex h-10 items-center rounded-[8px] px-3 text-sm font-semibold text-white shadow-[0_0_20px_rgba(124,106,245,0.3)] sm:px-5"
               style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)' }}
             >
@@ -588,7 +576,7 @@ export default function LandingPage() {
             className="mt-9 flex flex-col gap-3 sm:flex-row"
           >
             <Link
-              href="/login"
+              href="/dashboard"
               className="inline-flex h-[52px] items-center justify-center rounded-[12px] px-7 text-[15px] font-semibold text-white shadow-[0_18px_50px_rgba(124,106,245,0.28)] hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(124,106,245,0.45)]"
               style={{ background: 'linear-gradient(135deg, #7C6AF5 0%, #5B8DF5 100%)' }}
             >
@@ -794,7 +782,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/login"
+                  href="/dashboard"
                   className="mt-8 inline-flex h-11 w-full items-center justify-center rounded-[10px] text-sm font-bold text-white"
                   style={{
                     background: plan.popular
@@ -865,7 +853,7 @@ export default function LandingPage() {
           <div className="relative mx-auto mt-8 inline-flex">
             <span className="pointer-events-none absolute left-1/2 top-1/2 h-[120px] w-[120px] rounded-full border border-[#7C6AF5]/15" style={{ animation: 'sonar-pulse 2.4s ease-out infinite' }} />
             <Link
-              href="/login"
+              href="/dashboard"
               className="relative inline-flex h-[52px] items-center justify-center rounded-[10px] bg-white px-8 text-sm font-bold text-[#06080F] hover:bg-[#F1F5F9]"
             >
               Get Started Free
@@ -912,3 +900,4 @@ export default function LandingPage() {
     </main>
   );
 }
+

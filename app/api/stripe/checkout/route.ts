@@ -2,8 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { auth } from '@/auth';
-import { getUserId, ANONYMOUS_USER_ID } from '@/lib/session';
+import { getUserId } from '@/lib/session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,12 +20,7 @@ export async function POST(request: Request) {
     }
 
     const userId = await getUserId();
-    if (userId === ANONYMOUS_USER_ID) {
-      return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
-    }
-
-    const session = await auth();
-    const email = session?.user?.email ?? '';
+    const email = '';
     const origin = new URL(request.url).origin;
     const stripe = new Stripe(stripeSecretKey);
 
