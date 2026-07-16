@@ -8,6 +8,7 @@ import {
   Bookmark,
   Calendar,
   FileText,
+  GraduationCap,
   HelpCircle,
   Landmark,
   LayoutDashboard,
@@ -45,6 +46,7 @@ const navGroups = [
   {
     heading: 'Learn',
     items: [
+      { label: 'Learning Journey', href: '/journey', icon: GraduationCap, hint: 'Guided' },
       { label: 'AI Tutor', href: '/tutor', icon: Wand2, hint: 'Ask' },
       { label: 'Lessons', href: '/lessons', icon: BookOpen, hint: 'Explain' },
       { label: 'Notes', href: '/notes', icon: FileText, hint: 'Summaries' },

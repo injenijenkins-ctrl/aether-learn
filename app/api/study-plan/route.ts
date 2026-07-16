@@ -1,22 +1,19 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { generateCompletion, parseProviderFromRequest } from '@/lib/ai-provider';
+import { generateCompletion, resolveRequestProvider } from '@/lib/ai-provider';
 import { getSupabase } from '@/lib/supabase';
 import { getUserId } from '@/lib/session';
 import { vectorStore } from '@/lib/vector-store';
-import { checkAndDeductCredit } from '@/lib/credits';
 import { retrieveContextWithSources } from '@/lib/rag';
+import {
+  enforceAIUsageLimit,
+  usageLimitResponse,
+  withUsageHeaders,
+} from '@/lib/ai-usage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
-
-const MASTER_PROVIDER = {
-  apiKey: process.env.MASTER_AI_KEY || '',
-  baseUrl: process.env.MASTER_AI_BASE_URL || 'https://openrouter.ai/api/v1',
-  model: process.env.MASTER_AI_MODEL || 'qwen/qwen3-8b:free',
-  embeddingModel: 'text-embedding-3-small',
-};
 
 export async function GET() {
   try {
@@ -60,29 +57,19 @@ export async function POST(request: Request) {
     
     // Determine provider — BYO key or master key
     let provider;
-    let usingMasterKey = false;
 
     try {
-      provider = parseProviderFromRequest(request, body);
+      ({ provider } = await resolveRequestProvider(request, body, 'content_summarization'));
     } catch {
-      if (!MASTER_PROVIDER.apiKey) {
-        return NextResponse.json(
-          { error: 'No AI provider configured. Add your API key in Settings.' },
-          { status: 400 }
-        );
-      }
-      provider = MASTER_PROVIDER;
-      usingMasterKey = true;
+      return NextResponse.json(
+        { error: 'No AI provider configured. Add your API key in Settings.' },
+        { status: 400 }
+      );
     }
 
-    // Check credits if using master key
-    if (usingMasterKey) {
-      const userId = await getUserId();
-      const { allowed, message } = await checkAndDeductCredit(userId);
-
-      if (!allowed) {
-        return NextResponse.json({ error: message }, { status: 429 });
-      }
+    const usage = await enforceAIUsageLimit(request);
+    if (!usage.allowed) {
+      return usageLimitResponse(usage);
     }
 
     const { dailyMinutes, targetTopics, studyGoal } = body as {
@@ -142,7 +129,7 @@ Study goal: ${studyGoal}. Daily budget: ${dailyMinutes} minutes. Target topics: 
       throw new Error(error.message);
     }
 
-    return NextResponse.json({
+    return withUsageHeaders(NextResponse.json({
       id,
       dailyMinutes,
       targetTopics: targetTopics.trim(),
@@ -150,7 +137,7 @@ Study goal: ${studyGoal}. Daily budget: ${dailyMinutes} minutes. Target topics: 
       days: parsed.days,
       sources,
       createdAt,
-    });
+    }), usage);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to generate study plan';

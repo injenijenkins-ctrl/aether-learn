@@ -1,23 +1,20 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { generateCompletion, parseProviderFromRequest } from '@/lib/ai-provider';
+import { generateCompletion, resolveRequestProvider } from '@/lib/ai-provider';
 import { getSupabase } from '@/lib/supabase';
 import { retrieveContextWithSources } from '@/lib/rag';
 import { getUserId } from '@/lib/session';
-import { checkAndDeductCredit } from '@/lib/credits';
+import {
+  enforceAIUsageLimit,
+  usageLimitResponse,
+  withUsageHeaders,
+} from '@/lib/ai-usage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 type Depth = 'beginner' | 'deeper' | 'real_world' | 'simpler';
-
-const MASTER_PROVIDER = {
-  apiKey: process.env.MASTER_AI_KEY || '',
-  baseUrl: process.env.MASTER_AI_BASE_URL || 'https://openrouter.ai/api/v1',
-  model: process.env.MASTER_AI_MODEL || 'qwen/qwen3-8b:free',
-  embeddingModel: 'text-embedding-3-small',
-};
 
 export async function POST(request: Request) {
   try {
@@ -34,29 +31,19 @@ export async function POST(request: Request) {
 
     // Determine provider
     let provider;
-    let usingMasterKey = false;
 
     try {
-      provider = parseProviderFromRequest(request, body);
+      ({ provider } = await resolveRequestProvider(request, body, 'deep_tutoring'));
     } catch {
-      if (!MASTER_PROVIDER.apiKey) {
-        return NextResponse.json(
-          { error: 'No AI provider configured. Add your API key in Settings.' },
-          { status: 400 }
-        );
-      }
-      provider = MASTER_PROVIDER;
-      usingMasterKey = true;
+      return NextResponse.json(
+        { error: 'No AI provider configured. Add your API key in Settings.' },
+        { status: 400 }
+      );
     }
 
-    // Check credits if using master key
-    if (usingMasterKey) {
-      const userId = await getUserId();
-      const { allowed, message } = await checkAndDeductCredit(userId);
-
-      if (!allowed) {
-        return NextResponse.json({ error: message }, { status: 429 });
-      }
+    const usage = await enforceAIUsageLimit(request);
+    if (!usage.allowed) {
+      return usageLimitResponse(usage);
     }
 
     let depthLevel: Depth =
@@ -103,7 +90,7 @@ Depth level: ${depthLevel}. Student proficiency: ${level}. Adjust vocabulary and
 
       if (error) console.error('lesson_history insert failed:', error);
 
-      return NextResponse.json({ ...lesson, sources });
+      return withUsageHeaders(NextResponse.json({ ...lesson, sources }), usage);
     } catch {
       return NextResponse.json(
         { error: 'Failed to parse lesson' },

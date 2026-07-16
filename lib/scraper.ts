@@ -1,22 +1,29 @@
 import { extractTextFromHtml } from './chunking';
+import { safeFetchText, UnsafeUrlError } from './url-guard';
 
 export async function scrapeUrl(
   url: string
 ): Promise<{ title: string; content: string }> {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (compatible; AetherLearn/1.0; +https://aetherlearn.local)',
-      Accept: 'text/html,application/xhtml+xml',
-    },
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch URL: ${response.status}`);
+  let html: string;
+  try {
+    const result = await safeFetchText(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; AetherLearn/1.0; +https://aetherlearn.local)',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+    html = result.html;
+  } catch (error) {
+    if (error instanceof UnsafeUrlError) {
+      // Re-throw with the same message but keep the type info available
+      // to callers that want to distinguish "blocked" from "network failure".
+      throw error;
+    }
+    throw new Error(
+      `Failed to fetch URL: ${error instanceof Error ? error.message : 'unknown error'}`
+    );
   }
-
-  const html = await response.text();
 
   let title = 'Untitled';
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);

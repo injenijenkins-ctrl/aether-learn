@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
-import { generateCompletion, parseProviderFromRequest } from '@/lib/ai-provider';
+import { generateCompletion, resolveRequestProvider } from '@/lib/ai-provider';
+import { enforceAIUsageLimit, usageLimitResponse } from '@/lib/ai-usage';
 import { extractTextFromFile, validateFileSize } from '@/lib/file-extract';
 import { getSupabase } from '@/lib/supabase';
 import { getUserId } from '@/lib/session';
@@ -9,13 +10,6 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const MASTER_PROVIDER = {
-  apiKey: process.env.MASTER_AI_KEY || '',
-  baseUrl: process.env.MASTER_AI_BASE_URL || 'https://openrouter.ai/api/v1',
-  model: process.env.MASTER_AI_MODEL || 'qwen/qwen3-8b:free',
-  embeddingModel: 'text-embedding-3-small',
-};
-
 function extractJson(text: string) {
   const fenced = text.match(/```json\s*([\s\S]*?)```/i)?.[1];
   const raw = fenced || text.match(/\{[\s\S]*\}/)?.[0] || text;
@@ -23,12 +17,8 @@ function extractJson(text: string) {
 }
 
 async function providerFor(request: Request, body?: Record<string, unknown>) {
-  try {
-    return parseProviderFromRequest(request, body);
-  } catch {
-    if (!MASTER_PROVIDER.apiKey) throw new Error('No AI provider configured.');
-    return MASTER_PROVIDER;
-  }
+  const { provider } = await resolveRequestProvider(request, body, 'content_summarization');
+  return provider;
 }
 
 export async function GET() {
@@ -104,6 +94,12 @@ export async function POST(request: Request) {
     }
 
     const provider = await providerFor(request, providerBody);
+
+    const usage = await enforceAIUsageLimit(request);
+    if (!usage.allowed) {
+      return usageLimitResponse(usage);
+    }
+
     const prompt = `Analyze this ${examType} past paper with exam intelligence.
 Return strict JSON with this shape:
 {

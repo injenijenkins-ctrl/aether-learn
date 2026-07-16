@@ -8,7 +8,7 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const provider = parseProviderFromRequest(request, body);
+    const provider = await parseProviderFromRequest(request, body);
 
     const probe = await generateCompletion(
       'Reply with exactly: OK',

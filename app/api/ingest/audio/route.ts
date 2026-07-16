@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
     validateFileSize(file.size, MAX_AUDIO_BYTES);
 
-    const provider = parseProviderFromRequest(request);
+    const provider = await parseProviderFromRequest(request);
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const text = await transcribeAudio(buffer, file.name, provider);

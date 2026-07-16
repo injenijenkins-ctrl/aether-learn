@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
-import { parseProviderFromRequest, generateCompletion } from '@/lib/ai-provider';
+import { resolveRequestProvider, generateCompletion } from '@/lib/ai-provider';
+import { enforceAIUsageLimit, usageHeaders, usageLimitResponse } from '@/lib/ai-usage';
 import { retrieveContextWithSourcesForResources } from '@/lib/rag';
 import { getSupabase } from '@/lib/supabase';
 import { getUserId } from '@/lib/session';
@@ -9,13 +10,6 @@ import { assertCourseAccess, getApprovedResourceIds } from '@/lib/professor-cour
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
-
-const MASTER_PROVIDER = {
-  apiKey: process.env.MASTER_AI_KEY || '',
-  baseUrl: process.env.MASTER_AI_BASE_URL || 'https://openrouter.ai/api/v1',
-  model: process.env.MASTER_AI_MODEL || 'qwen/qwen3-8b:free',
-  embeddingModel: 'text-embedding-3-small',
-};
 
 export async function POST(request: Request) {
   try {
@@ -38,12 +32,14 @@ export async function POST(request: Request) {
 
     let provider;
     try {
-      provider = parseProviderFromRequest(request, body);
+      ({ provider } = await resolveRequestProvider(request, body, 'deep_tutoring'));
     } catch {
-      if (!MASTER_PROVIDER.apiKey) {
-        return NextResponse.json({ error: 'No AI provider configured.' }, { status: 400 });
-      }
-      provider = MASTER_PROVIDER;
+      return NextResponse.json({ error: 'No AI provider configured.' }, { status: 400 });
+    }
+
+    const usage = await enforceAIUsageLimit(request);
+    if (!usage.allowed) {
+      return usageLimitResponse(usage);
     }
 
     const { context, sources } = await retrieveContextWithSourcesForResources(
@@ -73,7 +69,7 @@ ${context}`;
       created_at: new Date().toISOString(),
     });
 
-    return NextResponse.json({ answer, sources });
+    return NextResponse.json({ answer, sources }, { headers: usageHeaders(usage) });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Course tutor failed';
     return NextResponse.json({ error: message }, { status: 500 });

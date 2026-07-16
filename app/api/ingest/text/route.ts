@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { parseProviderFromRequest } from '@/lib/ai-provider';
+import { resolveRequestProvider } from '@/lib/ai-provider';
+import { enforceAIUsageLimit, usageHeaders, usageLimitResponse } from '@/lib/ai-usage';
 import { ingestContent } from '@/lib/ingest-pipeline';
 
 export const runtime = 'nodejs';
@@ -9,7 +10,22 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const provider = parseProviderFromRequest(request, body);
+
+    let provider;
+    try {
+      ({ provider } = await resolveRequestProvider(request, body, 'embedding'));
+    } catch {
+      return NextResponse.json(
+        { error: 'No AI provider configured. Add your API key in Settings.' },
+        { status: 400 }
+      );
+    }
+
+    const usage = await enforceAIUsageLimit(request);
+    if (!usage.allowed) {
+      return usageLimitResponse(usage);
+    }
+
     const { text, title } = body as { text?: string; title?: string };
 
     if (!text || typeof text !== 'string') {
@@ -30,7 +46,7 @@ export async function POST(request: Request) {
 
     const result = await ingestContent(resourceTitle, text, 'text', provider);
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: usageHeaders(usage) });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Ingest failed';
     return NextResponse.json({ error: message }, { status: 500 });

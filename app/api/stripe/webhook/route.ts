@@ -33,11 +33,21 @@ export async function POST(request: Request) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.user_id;
+    // Which tier was purchased — expects the checkout session to be created
+    // with metadata.tier set to 'basic' | 'plus' | 'pro'. Falls back to
+    // 'pro' for backward compatibility with any checkout links that don't
+    // yet set this metadata.
+    const purchasedTier = session.metadata?.tier || 'pro';
 
     if (userId) {
+      // NOTE: previously this only set is_pro=true and daily_credits, but
+      // never touched ai_tier — the actual rate-limiting column. Since
+      // ai_tier defaults to 'free' (NOT NULL), getUserTier()'s fallback
+      // check for is_pro never fired, meaning paying customers were still
+      // capped at the free tier. Set ai_tier directly as the source of truth.
       await getSupabase()
         .from('users')
-        .update({ is_pro: true, daily_credits: 999999 })
+        .update({ is_pro: true, ai_tier: purchasedTier })
         .eq('id', userId);
     }
   }

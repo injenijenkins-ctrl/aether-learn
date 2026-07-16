@@ -4,11 +4,15 @@
 
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { generateCompletion, parseProviderFromRequest } from '@/lib/ai-provider';
-import { checkAndDeductCredit } from '@/lib/credits';
+import { generateCompletion, resolveRequestProvider } from '@/lib/ai-provider';
 import { retrieveContextWithSources, type SourceCitation } from '@/lib/rag';
 import { getUserId } from '@/lib/session';
 import { getSupabase } from '@/lib/supabase';
+import {
+  enforceAIUsageLimit,
+  usageLimitResponse,
+  withUsageHeaders,
+} from '@/lib/ai-usage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,13 +37,6 @@ type GeneratedExam = {
   questions: ExamQuestion[];
   totalMarks: number;
   sources?: SourceCitation[];
-};
-
-const MASTER_PROVIDER = {
-  apiKey: process.env.MASTER_AI_KEY || '',
-  baseUrl: process.env.MASTER_AI_BASE_URL || 'https://openrouter.ai/api/v1',
-  model: process.env.MASTER_AI_MODEL || 'qwen/qwen3-8b:free',
-  embeddingModel: 'text-embedding-3-small',
 };
 
 const QUESTION_COUNTS = new Set([5, 10, 15, 20]);
@@ -108,29 +105,20 @@ export async function POST(request: Request) {
     }
 
     let provider;
-    let usingMasterKey = false;
-
     try {
-      provider = parseProviderFromRequest(request, body);
+      ({ provider } = await resolveRequestProvider(request, body, 'quiz_generation'));
     } catch {
-      if (!MASTER_PROVIDER.apiKey) {
-        return NextResponse.json(
-          { error: 'No AI provider configured. Add your API key in Settings.' },
-          { status: 400 }
-        );
-      }
-      provider = MASTER_PROVIDER;
-      usingMasterKey = true;
+      return NextResponse.json(
+        { error: 'No AI provider configured. Add your API key in Settings.' },
+        { status: 400 }
+      );
     }
 
     const userId = await getUserId();
 
-    if (usingMasterKey) {
-      const { allowed, message } = await checkAndDeductCredit(userId);
-
-      if (!allowed) {
-        return NextResponse.json({ error: message }, { status: 429 });
-      }
+    const usage = await enforceAIUsageLimit(request);
+    if (!usage.allowed) {
+      return usageLimitResponse(usage);
     }
 
     const { context, sources } = await retrieveContextWithSources(topic, provider);
@@ -179,7 +167,7 @@ Difficulty: ${difficulty}. Exam type: ${examType}. Question count: ${questionCou
 
     if (error) console.error('exam_history insert failed:', error);
 
-    return NextResponse.json({ ...exam, sources });
+    return withUsageHeaders(NextResponse.json({ ...exam, sources }), usage);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Exam generation failed';
     return NextResponse.json({ error: message }, { status: 500 });

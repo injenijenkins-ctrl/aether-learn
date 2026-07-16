@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { parseProviderFromRequest, streamCompletion, type ChatMessage } from '@/lib/ai-provider';
-import { checkAndDeductCredit, getCreditStatus } from '@/lib/credits';
+import { resolveRequestProvider, streamCompletion, type ChatMessage } from '@/lib/ai-provider';
+import { enforceAIUsageLimitForUser, getUsageStatus } from '@/lib/ai-usage';
 import { retrieveContext } from '@/lib/rag';
 import { getUserId } from '@/lib/session';
 import {
@@ -14,13 +14,6 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
-
-const MASTER_PROVIDER = {
-  apiKey: process.env.MASTER_AI_KEY || '',
-  baseUrl: process.env.MASTER_AI_BASE_URL || 'https://openrouter.ai/api/v1',
-  model: process.env.MASTER_AI_MODEL || 'qwen/qwen3-8b:free',
-  embeddingModel: 'text-embedding-3-small',
-};
 
 export async function GET(
   _request: Request,
@@ -39,11 +32,15 @@ export async function GET(
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
-    const [messages, members, hostCredits] = await Promise.all([
+    const [messages, members, hostUsage] = await Promise.all([
       getRoomMessages(id),
       getRoomMembers(id),
-      getCreditStatus(room.host_id),
+      getUsageStatus(room.host_id),
     ]);
+
+    // Shape kept identical to the legacy { credits, is_pro } contract that
+    // app/study-rooms/[id]/page.tsx already reads, so no frontend change needed.
+    const hostCredits = { credits: hostUsage.remaining, is_pro: hostUsage.tier !== 'free' };
 
     return NextResponse.json({ room, messages, members, hostCredits });
   } catch (error) {
@@ -76,25 +73,25 @@ export async function POST(
     let usingMasterKey = false;
 
     try {
-      provider = parseProviderFromRequest(request, body);
+      const resolved = await resolveRequestProvider(request, body, 'quick_qa');
+      provider = resolved.provider;
+      usingMasterKey = resolved.usingServerKey;
     } catch {
-      if (!MASTER_PROVIDER.apiKey) {
-        return NextResponse.json(
-          { error: 'No AI provider configured. Add your API key in Settings.' },
-          { status: 400 }
-        );
-      }
-      provider = MASTER_PROVIDER;
-      usingMasterKey = true;
+      return NextResponse.json(
+        { error: 'No AI provider configured. Add your API key in Settings.' },
+        { status: 400 }
+      );
     }
 
     let remaining: number | null = null;
     if (usingMasterKey) {
-      const { allowed, remaining: credits, message } = await checkAndDeductCredit(room.host_id);
-      remaining = credits;
+      // Group rooms draw from the HOST's plan, not the sender's — a
+      // guest in someone else's room doesn't need their own tier.
+      const usage = await enforceAIUsageLimitForUser(request, room.host_id);
+      remaining = usage.remaining;
 
-      if (!allowed) {
-        return NextResponse.json({ error: message }, { status: 429 });
+      if (!usage.allowed) {
+        return NextResponse.json({ error: usage.message }, { status: 429 });
       }
     }
 

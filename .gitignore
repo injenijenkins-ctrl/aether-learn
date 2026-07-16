@@ -17,3 +17,4 @@ data/*.db-*
 .DS_Store
 .vercel
 pnpm-lock.yaml
+.env*

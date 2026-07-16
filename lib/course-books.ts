@@ -39,12 +39,12 @@ async function getResourceChunkCounts(resourceIds: string[]) {
   if (ids.length === 0) return counts;
 
   const { data } = await getSupabase()
-    .from('chunks')
-    .select('resource_id')
-    .in('resource_id', ids);
+    .from('embeddings')
+    .select('source_id')
+    .in('source_id', ids);
 
   for (const row of data || []) {
-    counts.set(row.resource_id, (counts.get(row.resource_id) || 0) + 1);
+    counts.set(row.source_id, (counts.get(row.source_id) || 0) + 1);
   }
 
   return counts;

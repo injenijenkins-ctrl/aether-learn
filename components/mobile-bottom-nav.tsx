@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Home, Layers, Upload, Wand2 } from 'lucide-react';
+import { GraduationCap, Home, Layers, Upload, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const mobileNavItems = [
   { label: 'Home', href: '/dashboard', icon: Home },
   { label: 'Add', href: '/ingestion', icon: Upload },
   { label: 'Tutor', href: '/tutor', icon: Wand2 },
-  { label: 'Learn', href: '/lessons', icon: BookOpen },
+  { label: 'Journey', href: '/journey', icon: GraduationCap },
   { label: 'Review', href: '/flashcards', icon: Layers },
 ];
 

@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   Clock3,
   Flame,
+  GraduationCap,
   HelpCircle,
   Target,
   Upload,
@@ -183,6 +184,14 @@ export default function DashboardPage() {
   ];
 
   const quickActions = [
+    {
+      href: '/journey',
+      icon: GraduationCap,
+      title: 'Learning Journey',
+      desc: 'Guided teach → flashcards → quiz',
+      color: '#A99BFF',
+      bg: 'rgba(124,106,245,0.12)',
+    },
     {
       href: '/course-books',
       icon: BookMarked,

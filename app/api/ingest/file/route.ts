@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { parseProviderFromRequest } from '@/lib/ai-provider';
+import { resolveRequestProvider } from '@/lib/ai-provider';
+import { enforceAIUsageLimit, usageHeaders, usageLimitResponse } from '@/lib/ai-usage';
 import { ingestContent } from '@/lib/ingest-pipeline';
 import {
   ALLOWED_FILE_EXTENSIONS,
@@ -13,6 +14,21 @@ export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
+    let provider;
+    try {
+      ({ provider } = await resolveRequestProvider(request, undefined, 'embedding'));
+    } catch {
+      return NextResponse.json(
+        { error: 'No AI provider configured. Add your API key in Settings.' },
+        { status: 400 }
+      );
+    }
+
+    const usage = await enforceAIUsageLimit(request);
+    if (!usage.allowed) {
+      return usageLimitResponse(usage);
+    }
+
     const formData = await request.formData();
     const file = formData.get('file');
 
@@ -40,13 +56,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const provider = parseProviderFromRequest(request);
-
     const title =
       formData.get('title')?.toString()?.trim() || file.name.replace(/\.[^.]+$/, '');
 
     const result = await ingestContent(title, text, 'file', provider);
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: usageHeaders(usage) });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'File ingest failed';
     return NextResponse.json({ error: message }, { status: 500 });

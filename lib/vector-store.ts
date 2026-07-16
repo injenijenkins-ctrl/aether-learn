@@ -1,6 +1,8 @@
 import { getSupabase } from './supabase';
 import { getUserId } from './session';
 
+const EMBEDDING_DIMENSION = 1536;
+
 export interface Chunk {
   id: string;
   text: string;
@@ -22,18 +24,27 @@ export interface Resource {
   createdAt: Date;
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length || a.length === 0) return 0;
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
+type MatchEmbeddingRow = {
+  id: string;
+  content_chunk: string;
+  embedding: unknown;
+  source_id: string;
+  metadata?: {
+    resource_title?: string;
+    resource_type?: Resource['type'];
+  };
+  resource_title?: string | null;
+  resource_type?: string | null;
+};
+
+function vectorLiteral(embedding: number[]): string {
+  if (embedding.length !== EMBEDDING_DIMENSION) {
+    throw new Error(
+      `Embedding dimension mismatch: expected ${EMBEDDING_DIMENSION}, received ${embedding.length}`
+    );
   }
-  const denom = Math.sqrt(normA) * Math.sqrt(normB);
-  return denom === 0 ? 0 : dot / denom;
+
+  return `[${embedding.join(',')}]`;
 }
 
 function parseEmbedding(value: unknown): number[] {
@@ -71,16 +82,17 @@ function rowToResource(
 async function loadChunksForResource(resourceId: string): Promise<Chunk[]> {
   try {
     const { data, error } = await getSupabase()
-      .from('chunks')
-      .select('id, text, embedding')
-      .eq('resource_id', resourceId)
-      .order('id');
+      .from('embeddings')
+      .select('id, content_chunk, embedding')
+      .eq('source_id', resourceId)
+      .order('created_at', { ascending: true });
 
-    if (error || !data) return [];
+    if (error) throw new Error(`Failed to load embeddings: ${error.message}`);
+    if (!data) return [];
 
     return data.map((r) => ({
       id: r.id,
-      text: r.text,
+      text: r.content_chunk,
       embedding: parseEmbedding(r.embedding),
     }));
   } catch {
@@ -98,13 +110,13 @@ class VectorStore {
 
     const supabase = getSupabase();
 
-    const { error: deleteChunksError } = await supabase
-      .from('chunks')
+    const { error: deleteEmbeddingsError } = await supabase
+      .from('embeddings')
       .delete()
-      .eq('resource_id', resource.id);
+      .eq('source_id', resource.id);
 
-    if (deleteChunksError) {
-      throw new Error(`Failed to clear chunks: ${deleteChunksError.message}`);
+    if (deleteEmbeddingsError) {
+      throw new Error(`Failed to clear embeddings: ${deleteEmbeddingsError.message}`);
     }
 
     const { error: resourceError } = await supabase.from('resources').upsert({
@@ -121,18 +133,23 @@ class VectorStore {
     }
 
     if (resource.chunks.length > 0) {
-      const { error: chunksError } = await supabase.from('chunks').insert(
+      const { error: embeddingsError } = await supabase.from('embeddings').insert(
         resource.chunks.map((chunk) => ({
           id: chunk.id,
-          resource_id: resource.id,
-          user_id: uid,
-          text: chunk.text,
-          embedding: chunk.embedding,
+          content_chunk: chunk.text,
+          embedding: vectorLiteral(chunk.embedding),
+          source_id: resource.id,
+          metadata: {
+            user_id: uid,
+            resource_title: resource.title,
+            resource_type: resource.type,
+          },
+          created_at: createdAt,
         }))
       );
 
-      if (chunksError) {
-        throw new Error(`Failed to add chunks: ${chunksError.message}`);
+      if (embeddingsError) {
+        throw new Error(`Failed to add embeddings: ${embeddingsError.message}`);
       }
     }
   }
@@ -141,7 +158,14 @@ class VectorStore {
     try {
       const supabase = getSupabase();
 
-      await supabase.from('chunks').delete().eq('resource_id', id);
+      const { error: embeddingError } = await supabase
+        .from('embeddings')
+        .delete()
+        .eq('source_id', id);
+
+      if (embeddingError) {
+        throw new Error(`Failed to delete embeddings: ${embeddingError.message}`);
+      }
 
       let query = supabase.from('resources').delete().eq('id', id);
       if (userId) {
@@ -150,7 +174,7 @@ class VectorStore {
 
       const { data, error } = await query.select('id');
 
-      if (error) return false;
+      if (error) throw new Error(`Failed to delete resource: ${error.message}`);
       return (data?.length ?? 0) > 0;
     } catch {
       return false;
@@ -218,90 +242,23 @@ class VectorStore {
   ): Promise<SourceChunk[]> {
     try {
       const supabase = getSupabase();
-      let rows: { id: string; resource_id: string; text: string; embedding: unknown }[] = [];
-      let resources: { id: string; title: string; type: string }[] = [];
+      const { data, error } = await supabase.rpc('match_embeddings', {
+        query_embedding: vectorLiteral(queryEmbedding),
+        match_count: topK,
+        filter_user_id: userId ?? null,
+        filter_source_ids: null,
+      });
 
-      if (userId) {
-        const { data: userResources } = await supabase
-          .from('resources')
-          .select('id, title, type')
-          .eq('user_id', userId);
+      if (error) throw new Error(`Failed to search embeddings: ${error.message}`);
 
-        resources = userResources || [];
-        const ids = resources.map((r) => r.id);
-        if (ids.length === 0) return [];
-
-        const { data, error } = await supabase
-          .from('chunks')
-          .select('id, resource_id, text, embedding')
-          .in('resource_id', ids);
-
-        if (error || !data) return [];
-        rows = data;
-      } else {
-        const [{ data: allResources }, { data, error }] = await Promise.all([
-          supabase
-            .from('resources')
-            .select('id, title, type'),
-          supabase
-            .from('chunks')
-            .select('id, resource_id, text, embedding'),
-        ]);
-
-        resources = allResources || [];
-
-        if (error || !data) return [];
-        rows = data;
-      }
-
-      const resourceMap = new Map(
-        resources.map((resource) => [
-          resource.id,
-          {
-            title: resource.title,
-            type: resource.type as Resource['type'],
-          },
-        ])
-      );
-
-      if (resources.length === 0 && rows.length > 0) {
-        const ids = Array.from(new Set(rows.map((row) => row.resource_id)));
-        const { data } = await supabase
-          .from('resources')
-          .select('id, title, type')
-          .in('id', ids);
-
-        for (const resource of data || []) {
-          resourceMap.set(resource.id, {
-            title: resource.title,
-            type: resource.type as Resource['type'],
-          });
-        }
-      }
-
-      const scored: { chunk: SourceChunk; score: number }[] = [];
-
-      for (const row of rows) {
-        const embedding = parseEmbedding(row.embedding);
-        const resource = resourceMap.get(row.resource_id);
-        const chunk: SourceChunk = {
-          id: row.id,
-          text: row.text,
-          embedding,
-          resourceId: row.resource_id,
-          resourceTitle: resource?.title || 'Untitled source',
-          resourceType: resource?.type || 'text',
-        };
-        scored.push({
-          chunk,
-          score: cosineSimilarity(queryEmbedding, embedding),
-        });
-      }
-
-      return scored
-        .sort((a, b) => b.score - a.score)
-        .slice(0, topK)
-        .map((s) => s.chunk);
+      return ((data || []) as MatchEmbeddingRow[]).map((row) => ({
+        id: row.id,
+        text: row.content_chunk,
+        embedding: parseEmbedding(row.embedding),
+        resourceId: row.source_id,
+        resourceTitle: row.resource_title || row.metadata?.resource_title || 'Untitled source',
+        resourceType: (row.resource_type || row.metadata?.resource_type || 'text') as Resource['type'],
+      }));
     } catch {
       return [];
     }
@@ -316,49 +273,23 @@ class VectorStore {
     if (ids.length === 0) return [];
 
     try {
-      const supabase = getSupabase();
-      const [{ data: resources }, { data, error }] = await Promise.all([
-        supabase
-          .from('resources')
-          .select('id, title, type')
-          .in('id', ids),
-        supabase
-          .from('chunks')
-          .select('id, resource_id, text, embedding')
-          .in('resource_id', ids),
-      ]);
+      const { data, error } = await getSupabase().rpc('match_embeddings', {
+        query_embedding: vectorLiteral(queryEmbedding),
+        match_count: topK,
+        filter_user_id: null,
+        filter_source_ids: ids,
+      });
 
-      if (error || !data) return [];
+      if (error) throw new Error(`Failed to search embeddings: ${error.message}`);
 
-      const resourceMap = new Map(
-        (resources || []).map((resource) => [
-          resource.id,
-          {
-            title: resource.title,
-            type: resource.type as Resource['type'],
-          },
-        ])
-      );
-
-      return data
-        .map((row) => {
-          const embedding = parseEmbedding(row.embedding);
-          const resource = resourceMap.get(row.resource_id);
-          return {
-            chunk: {
-              id: row.id,
-              text: row.text,
-              embedding,
-              resourceId: row.resource_id,
-              resourceTitle: resource?.title || 'Approved course material',
-              resourceType: resource?.type || 'text',
-            } as SourceChunk,
-            score: cosineSimilarity(queryEmbedding, embedding),
-          };
-        })
-        .sort((a, b) => b.score - a.score)
-        .slice(0, topK)
-        .map((entry) => entry.chunk);
+      return ((data || []) as MatchEmbeddingRow[]).map((row) => ({
+        id: row.id,
+        text: row.content_chunk,
+        embedding: parseEmbedding(row.embedding),
+        resourceId: row.source_id,
+        resourceTitle: row.resource_title || row.metadata?.resource_title || 'Approved course material',
+        resourceType: (row.resource_type || row.metadata?.resource_type || 'text') as Resource['type'],
+      }));
     } catch {
       return [];
     }
@@ -376,12 +307,29 @@ class VectorStore {
 
         const ids = (resources || []).map((r) => r.id);
         if (ids.length > 0) {
-          await supabase.from('chunks').delete().in('resource_id', ids);
+          const { error: embeddingError } = await supabase
+            .from('embeddings')
+            .delete()
+            .in('source_id', ids);
+          if (embeddingError) throw new Error(embeddingError.message);
         }
-        await supabase.from('resources').delete().eq('user_id', userId);
+        const { error: resourceError } = await supabase
+          .from('resources')
+          .delete()
+          .eq('user_id', userId);
+        if (resourceError) throw new Error(resourceError.message);
       } else {
-        await supabase.from('chunks').delete().neq('id', '');
-        await supabase.from('resources').delete().neq('id', '');
+        const { error: embeddingError } = await supabase
+          .from('embeddings')
+          .delete()
+          .neq('id', '');
+        if (embeddingError) throw new Error(embeddingError.message);
+
+        const { error: resourceError } = await supabase
+          .from('resources')
+          .delete()
+          .neq('id', '');
+        if (resourceError) throw new Error(resourceError.message);
       }
     } catch {
       // ignore
